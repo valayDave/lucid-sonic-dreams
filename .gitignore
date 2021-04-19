@@ -4,8 +4,16 @@ stylegan2/
 stylegan2_tf/
 */.ipynb_checkpoints/
 .ipynb_checkpoints/
+clmr_magnatagatune_mlp/
+clmr/
+
 # files
 *.mp3
 *.mp4
 *.pkl
+*.jpg
+*.pt
+*.zip
+*.png
 gen.py
+

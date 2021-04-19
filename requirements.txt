@@ -1,0 +1,22 @@
+torch
+librosa
+numpy
+moviepy
+Pillow
+tqdm
+scipy
+scikit-image
+pygit2
+gdown'
+mega.py
+requests
+pandas
+SoundFile
+# for clmr
+simclr
+torchaudio-augmentations
+torchaudio
+pytorch-lightning
+soundfile
+sklearn
+matplotlib

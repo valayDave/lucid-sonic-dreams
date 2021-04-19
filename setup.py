@@ -32,5 +32,13 @@ setuptools.setup(
                       'mega.py',
                       'requests',
                       'pandas',
-                      'SoundFile']
+                      'SoundFile',
+                      # for clmr
+                      "simclr",
+                      "torchaudio-augmentations",
+                      "torchaudio",
+                      "pytorch-lightning",
+                      "soundfile",
+                      "sklearn",
+                      "matplotlib"]
 )
