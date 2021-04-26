@@ -18,6 +18,7 @@ import moviepy.editor as mpy
 from moviepy.audio.AudioClip import AudioArrayClip
 import pygit2
 from importlib import import_module
+from tqdm import tqdm
 
 from .helper_functions import * 
 from .sample_effects import *
@@ -326,7 +327,6 @@ class LucidSonicDream:
 
         # make preds
         #ds = torch.utils.data.TensorDataset(splits)
-        from tqdm import tqdm
         ds = PieceDataset(audio, aud_len, step=frame_duration)
         dl = torch.utils.data.DataLoader(ds, batch_size=128, pin_memory=True, num_workers=4, shuffle=False)
         all_preds = []
@@ -352,6 +352,8 @@ class LucidSonicDream:
     torch.save(self.tags_magnatagatune, "clmr_tags.pt")
     
     # Calc repr vector per class (except no_vocal, no_voice)
+    # TODO: exclude some vectors or only include the top performing/interesting ones
+    
     style = self.style.split("/")[-1].split(".")[0].replace(".pkl", "").replace(".", "")
     latent_path = f"magnatagatune_{style}_latents.pt"
     if os.path.exists(latent_path):
@@ -367,18 +369,21 @@ class LucidSonicDream:
                 lr_schedule=1,
                 noise_opt=0,
                 epochs=1,
-                iterations=10,
-                batch_size=8,
+                iterations=1000,
+                batch_size=64,
                 style=self.style,
         )
         latents = []
         for tag in tqdm(self.tags_magnatagatune, position=0):
             tqdm.write(tag)
             imagine.set_clip_encoding(text=tag)
+            # train
             imagine()
-            imagine.reset()
+            # save trained results
             w_opt = imagine.model.model.w_opt.detach().cpu()
             latents.append(w_opt)
+            # reset
+            imagine.reset()
         latents = torch.cat(latents, dim=0)
         torch.save(latents, latent_path)
     print("Latents shape: ", latents.shape)  # should be (50, 18, 512) if opt_all_layers 
@@ -387,11 +392,41 @@ class LucidSonicDream:
     # clmr preds shape is (len_song, 50)
     if self.clmr_softmax:
         all_preds = torch.softmax(all_preds / self.clmr_softmax_t, dim=-1)
+    else:
+        # make normed distr over time
+        all_preds = (all_preds - all_preds.mean(dim=0, keepdims=True)) / all_preds.std(dim=0, keepdims=True)
+        all_preds = (all_preds.clamp(-1.5, 1.5) + 1.5) / 3
+        pass
+        # make distr per time_step
+        #all_preds /= all_preds.sum(dim=-1, keepdims=True)
+        
+    
+    #smooth_range = self.fps // 2  #self.clmr_smooth_range
+    # smooth forward in time
+    #smoothed = torch.stack([torch.mean(all_preds[i: i + smooth_range], dim=0) for i in range(len(all_preds - smooth_range))])
+    # smooth backwards in time
+    #smoothed = torch.stack([torch.mean(all_preds[max(i - smooth_range, 0): i + 1], dim=0) for i in range(len(all_preds))])
+    # smooth using ema
+    
+    spec_norm = self.spec_norm_class
+    # TODO: use spectral norm to influence how much change is allowed
+    
+    ema = self.clmr_ema
+    ema_value = all_preds[0]
+    smoothed = []
+    for i in range(len(all_preds)):
+        new_val = all_preds[i] * (1 - ema) * spec_norm[i] + ema_value * ema * (1 - spec_norm[i])
+        smoothed.append(new_val)
+    smoothed = torch.stack(smoothed)
     
     # TODO: Find out decision thresholds for each category by evaluating classifier on whole magnatagatune dataset!
     # TODO: filter out stuff like guitar/piano, no_vocal etc (or only include some good ones)
+    include_list = ["techno", "electronic", "classic", "classical", "slow", "fast", "loud", "soft", "quiet", "drums", "ambient"]
+    mask = [tag in include_list for tag in self.tags_magnatagatune]
+    #latents = latents[mask]
+    #smoothed = smoothed[:, mask]
     
-    self.noise = torch.stack([(pred.view(50, 1, 1) * latents).sum(dim=0) for pred in all_preds]).numpy()
+    self.noise = torch.stack([(pred.view(len(latents), 1, 1) * latents).sum(dim=0) for pred in smoothed]).numpy()
 
     
     #self.input_shape = latents[0].unsqueeze(0).shape    
@@ -639,7 +674,7 @@ class LucidSonicDream:
 
       # Re-initialize randomness factors every 4 seconds
       if i % round(fps * 4) == 0:
-        rand_factors = np.array([random.choice([1, 1-self.motion_randomness]) \
+        rand_factors = np.array([random.choice([1, 1 - self.motion_randomness]) \
                              for n in range(self.input_shape)])
 
       # Generate incremental update vectors for Pulse and Motion
@@ -866,6 +901,7 @@ class LucidSonicDream:
                   use_clmr=False,
                   clmr_softmax=False,
                   clmr_softmax_t=1.0,
+                  clmr_ema=0.9,
                  ):
     '''Full pipeline of video generation'''
 
@@ -890,6 +926,7 @@ class LucidSonicDream:
             sys.exit('{} must be between 0 and 1'.format(param))
 
     self.file_name = file_name if file_name[-4:] == '.mp4' else file_name + '.mp4'
+    self.file_name = self.file_name.split("/")[-1].replace(" ", "_")
     self.resolution = resolution
     self.batch_size = batch_size
     self.speed_fpm = speed_fpm
@@ -915,6 +952,7 @@ class LucidSonicDream:
     self.use_clmr = use_clmr
     self.clmr_softmax = clmr_softmax
     self.clmr_softmax_t = clmr_softmax_t
+    self.clmr_ema = clmr_ema
 
     # Initialize style
     if not self.style_exists:
@@ -981,7 +1019,7 @@ class LucidSonicDream:
     audio = mpy.AudioFileClip('tmp.wav', fps=self.sr * 2)
     video = mpy.ImageSequenceClip(self.frames_dir, fps=self.sr / self.frame_duration)
     video = video.set_audio(audio)
-    video.write_videofile(file_name,audio_codec='aac')
+    video.write_videofile(self.file_name, audio_codec='aac')
 
     # Delete temporary audio file
     os.remove('tmp.wav')
