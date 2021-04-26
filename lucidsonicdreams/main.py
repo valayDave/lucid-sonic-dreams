@@ -432,6 +432,140 @@ class LucidSonicDream:
     #self.input_shape = latents[0].unsqueeze(0).shape    
 
 
+  def extract_lyrics_meaning(self, lyrics_path):
+    # lyrics sample:
+    """
+    1
+    00:00:02,633 --> 00:00:05,532
+    <font color="#FFFFFF"><i>THREE, TWO, ONE.</i></font>
+
+    2
+    00:00:05,599 --> 00:00:08,000
+    ♪♪ OBIE TRICE
+    REAL NAME NO GIMMICKS... ♪
+    """
+    def time_str_to_seconds(time_str):
+        hrs_str = time_str.split(":")[0]
+        min_str = time_str.split(":")[1]
+        seconds_str = time_str.split(":")[2].split(",")[0]
+        ms_str = time_str.split(":")[2].split(",")[1]
+        return int(hrs_str) * 360 + int(min_str) * 60 + int(seconds_str) + int(ms_str) / 1000
+    
+    # read file
+    with open(lyrics_path, "r+") as f:
+        lines = [l for l in f]
+    # format and extract lines
+    #print(lines[:10])
+    texts = []
+    start_times = []
+    end_times = []
+    while len(lines) > 0:
+        #print("next lines")
+        #print(lines[0].strip("\n"))
+        #print(lines[1].strip("\n"))
+        #print(lines[2].strip("\n"))
+        count = 4
+        # read times
+        start_time_str = lines[1].split(" ")[0]
+        end_time_str = lines[1].split(" ")[-1]
+        # convert to seconds
+        start_time = time_str_to_seconds(start_time_str)
+        end_time = time_str_to_seconds(end_time_str)
+
+        # read text
+        text = lines[2].strip("♪.\n")
+        if lines[3] != "\n":
+            text += " " + lines[3].strip("♪.\n")
+            count += 1
+            if lines[4] != "\n":
+                text += " " + lines[4].strip("♪.\n")
+                count += 1
+                if lines[5] != "\n":
+                    text += " " + lines[5].strip("♪.\n")
+                    count += 1
+        # remove formatting commands
+        while text.find("<") != -1:
+            start = text.find("<")
+            end = text.find(">")
+            text = text[:start] + c[end + 1:]
+        # remove spaces and turn to lower-case
+        text = text.strip("♪ .\n").lower()
+
+        # save
+        texts.append(text)
+        start_times.append(start_time)
+        end_times.append(end_time)
+
+        # delete lines to move on in file
+        del lines[:count]
+
+    #print(texts[:5])
+    #print(start_times[:5])
+    #print(end_times[:5])
+    
+    # calc some stats about the song
+    frame_duration = self.frame_duration
+    num_frames = np.ceil(len(self.wav) / frame_duration)
+    # set path to save/load from
+    latent_folder = "lyric_latents"
+    os.makedirs(latent_folder, exist_ok=True)
+    style = self.style.split("/")[-1].split(".")[0].replace(".pkl", "").replace(".", "")
+    iterations = 20
+    latent_path = f"{latent_folder}/lyrics_{style}_latents_it{iterations}.pt"
+    print("Latents at: ", latent_path)
+    if os.path.exists(latent_path):
+        latents = torch.load(latent_path)
+    else:
+        sys.path.append("../StyleCLIP_modular")
+
+        from style_clip import Imagine
+        imagine = Imagine(
+                save_progress=False,
+                open_folder=False,
+                save_video=False,
+                opt_all_layers=1,
+                lr_schedule=1,
+                noise_opt=0,
+                epochs=1,
+                iterations=iterations,
+                batch_size=32,
+                style=self.style,
+        )
+
+        # calc latents for each phrase
+        latents = {}
+        for phrase in tqdm(set(texts), position=0):
+            tqdm.write(phrase)
+            imagine.set_clip_encoding(text=phrase)
+            # train
+            imagine()
+            # save trained results
+            w_opt = imagine.model.model.w_opt.detach().cpu()
+            latents[phrase] = w_opt
+            # reset
+            imagine.reset()
+        # save latents
+        torch.save(latents, latent_path)
+        
+    # assign latents to frames
+    noise = []
+    print(num_frames)
+    print(frame_duration)
+    for i in range(int(num_frames)):
+        print(i)
+        print(i * frame_duration)
+        print(end_times[0])
+        print()
+        current_text = texts[0]
+        current_latent = latents[current_text]
+        noise.append(current_latent)
+        
+        if i * frame_duration > end_times[0]:
+            del end_times[0]
+            del texts[0]
+    self.noise = noise
+    
+
   def load_specs(self):
     '''Load normalized spectrograms and chromagram'''
 
@@ -627,6 +761,10 @@ class LucidSonicDream:
     # If num_init_noise < 2, simply initialize the same 
     # noise vector for all frames 
     if self.use_clmr:
+        noise = self.noise
+        self.class_vecs = noise
+        return
+    elif self.visualize_lyrics:
         noise = self.noise
         self.class_vecs = noise
         return
@@ -847,7 +985,7 @@ class LucidSonicDream:
             final_images.append(array)
             
             
-        if len(final_images) > 1000:
+        if len(final_images) > self.max_frames_in_mem:
             self.store_imgs(file_names, final_images, resolution)
             file_names = []
             final_images = []
@@ -902,6 +1040,9 @@ class LucidSonicDream:
                   clmr_softmax=False,
                   clmr_softmax_t=1.0,
                   clmr_ema=0.9,
+                  
+                  visualize_lyrics=0,
+                  lyrics_path=None,
                  ):
     '''Full pipeline of video generation'''
 
@@ -953,6 +1094,8 @@ class LucidSonicDream:
     self.clmr_softmax = clmr_softmax
     self.clmr_softmax_t = clmr_softmax_t
     self.clmr_ema = clmr_ema
+    # lyrics params
+    self.visualize_lyrics = visualize_lyrics
 
     # Initialize style
     if not self.style_exists:
@@ -990,6 +1133,9 @@ class LucidSonicDream:
     if self.use_clmr:
         # Make CLMR preds:
         self.clmr_init()
+        
+    if visualize_lyrics:
+        self.extract_lyrics_meaning(lyrics_path)
         
     # Initialize effects
     print('Loading effects...')

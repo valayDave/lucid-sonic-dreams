@@ -1,4 +1,6 @@
 import time
+import os
+
 #from main import LucidSonicDream
 from lucidsonicdreams.main import LucidSonicDream
 #from lucidsonicdreams import LucidSonicDream
@@ -6,6 +8,13 @@ from lucidsonicdreams.main import LucidSonicDream
 styles = ["../stylegan2-ada-pytorch/jan_regnart_640.pkl", "../stylegan2-ada-pytorch/madziowa_p_800.pkl", "microscope images", "imagenet", "faces (ffhq config-f)", "../stylegan2-ada-pytorch/VisionaryArt.pkl", "../stylegan2-ada-pytorch/astromaniacmag_160.pkl"]
 
 songs = ["songs/henne_song.mp3", "songs/gnossi_1.mp3"]
+
+lyric_songs = ["Dancing Queen.mp3", "like a rolling Stone.mp3", "Shia LaBeouf.mp3", "Smells Like Teen Spirit.mp3", "Space Oddity.mp3", "This Is America.mp3", "Without Me.mp3"]
+lyrics = ["Dancing Queen.srt", "like a rolling Stone.srt", "Shia LaBeouf.srt", "Smells Like Teen Spirit.srt", "Space Oddity.srt", "This Is America.srt", "Without Me.srt"]
+
+lyric_songs = [os.path.join("songs_with_lyrics", l) for l in lyric_songs]
+lyrics = [os.path.join("songs_with_lyrics", l) for l in lyrics]
+
 
 
 def hallus(style, song, **kwargs):
@@ -19,6 +28,10 @@ def hallus(style, song, **kwargs):
     song_name = song.split(".")[0]
     L.hallucinate(file_name=f"{time_str}_{song_name}_{style_name}.mp4", **kwargs)
 
+    
+hallus(styles[1], lyric_songs[1], lyrics_path=lyrics[1], batch_size=4, visualize_lyrics=1)
+    
+quit()
     
 hallus(styles[-1], songs[1], duration=None, batch_size=4, pulse_react=0.55, motion_react=1.0, fps=60, speed_fpm=1, start=7) 
 
