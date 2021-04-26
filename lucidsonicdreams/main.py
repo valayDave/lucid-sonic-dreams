@@ -553,17 +553,19 @@ class LucidSonicDream:
     print(frame_duration)
     for i in range(int(num_frames)):
         print(i)
-        print(i * frame_duration)
+        print(i / self.fps)
         print(end_times[0])
         print()
         current_text = texts[0]
         current_latent = latents[current_text]
-        noise.append(current_latent)
+        noise.append(current_latent.squeeze().numpy())
         
-        if i * frame_duration > end_times[0]:
-            del end_times[0]
-            del texts[0]
-    self.noise = noise
+        if len(end_times) > 1:
+            if i / self.fps > end_times[0]:
+                del end_times[0]
+                del texts[0]
+    self.noise = np.array(noise)
+    print("Noise shape: ", self.noise.shape)
     
 
   def load_specs(self):
@@ -794,16 +796,18 @@ class LucidSonicDream:
     self.class_vecs = []
 
     # Initialize "base" vectors based on Pulse/Motion Reactivity values
-    pulse_base = np.array([self.pulse_react] * self.input_shape)
-    motion_base = np.array([motion_react] * self.input_shape)
+    pulse_base = np.ones_like(self.input_shape) * self.pulse_react  #  np.array([self.pulse_react] * self.input_shape)
+    motion_base = np.ones_like(self.input_shape) * motion_react  # np.array([motion_react] * self.input_shape)
 
     # Randomly initialize "update directions" of noise vectors
-    self.motion_signs = np.array([random.choice([1,-1]) \
-                                  for n in range(self.input_shape)])
+    self.motion_signs = np.array([random.choice(1, -1) for _ in range(len(self.input_shape.flatten()))]).reshape(self.input_shape)
+    #self.motion_signs = np.array([random.choice([1,-1]) \
+    #                              for n in range(self.input_shape)])
 
     # Randomly initialize factors based on motion_randomness
-    rand_factors = np.array([random.choice([1, 1 - self.motion_randomness]) \
-                             for n in range(self.input_shape)])
+    rand_factors = np.array([random.choice(1, 1 - self.motion_randomness) for _ in range(len(self.input_shape.flatten()))]).reshape(self.input_shape)
+    #rand_factors = np.array([random.choice([1, 1 - self.motion_randomness]) \
+    #                         for n in range(self.input_shape)])
 
     
 
@@ -812,8 +816,9 @@ class LucidSonicDream:
 
       # Re-initialize randomness factors every 4 seconds
       if i % round(fps * 4) == 0:
-        rand_factors = np.array([random.choice([1, 1 - self.motion_randomness]) \
-                             for n in range(self.input_shape)])
+        rand_factors = np.array([random.choice(1, 1 - self.motion_randomness) for _ in range(len(self.input_shape.flatten()))]).reshape(self.input_shape)
+        #rand_factors = np.array([random.choice([1, 1 - self.motion_randomness]) \
+        #                     for n in range(self.input_shape)])
 
       # Generate incremental update vectors for Pulse and Motion
       pulse_noise_add = pulse_base * self.spec_norm_pulse[i]
@@ -962,7 +967,7 @@ class LucidSonicDream:
             else:
                 noise_batch = noise_batch.to(device)
                 with torch.no_grad():
-                    if self.use_clmr:
+                    if self.use_clmr or self.visualize_lyrics:
                         w_batch = noise_batch
                     else:
                         w_batch = self.Gs.mapping(noise_batch, class_batch.to(device), truncation_psi=self.truncation_psi)
@@ -1035,6 +1040,7 @@ class LucidSonicDream:
                   flash_percussive: bool = None,
                   custom_effects: list = None,
                   truncation_psi: float = 1.0,
+                  max_frames_in_mem: int = 1000,
                   
                   use_clmr=False,
                   clmr_softmax=False,
@@ -1087,6 +1093,7 @@ class LucidSonicDream:
     self.flash_strength = flash_strength
     self.flash_percussive = flash_percussive
     self.custom_effects = custom_effects 
+    self.max_frames_in_mem = max_frames_in_mem
     # stylegan2 params
     self.truncation_psi = truncation_psi
     # clmr params
