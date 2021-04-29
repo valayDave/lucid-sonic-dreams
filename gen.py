@@ -5,17 +5,23 @@ import os
 from lucidsonicdreams.main import LucidSonicDream
 #from lucidsonicdreams import LucidSonicDream
 
-styles = ["../stylegan2-ada-pytorch/jan_regnart_640.pkl", "../stylegan2-ada-pytorch/madziowa_p_800.pkl", "microscope images", "imagenet", "faces (ffhq config-f)", "../stylegan2-ada-pytorch/VisionaryArt.pkl", "../stylegan2-ada-pytorch/astromaniacmag_160.pkl"]
+styles = {"janregnar": "../stylegan2-ada-pytorch/jan_regnart_640.pkl", 
+          "madziowa": "../stylegan2-ada-pytorch/madziowa_p_800.pkl",
+          "microscope": "microscope images", 
+          "imagenet": "imagenet", 
+          "ffhq": "faces (ffhq config-f)", 
+          "Visionaryart": "../stylegan2-ada-pytorch/VisionaryArt.pkl", 
+          "astromaniacmag": "../stylegan2-ada-pytorch/astromaniacmag_160.pkl",
+          "vint_retro_scifi": "../stylegan2-ada-pytorch/vint_retro_scifi_3200_2map.pkl",
+          "therealtheory": "../stylegan2-ada-pytorch/therealtheory_540.pkl"}
 
 songs = ["songs/henne_song.mp3", "songs/gnossi_1.mp3"]
 
-lyric_songs = ["Dancing Queen.mp3", "like a rolling Stone.mp3", "Shia LaBeouf.mp3", "Smells Like Teen Spirit.mp3", "Space Oddity.mp3", "This Is America.mp3", "Without Me.mp3"]
-lyrics = ["Dancing Queen.srt", "like a rolling Stone.srt", "Shia LaBeouf.srt", "Smells Like Teen Spirit.srt", "Space Oddity.srt", "This Is America.srt", "Without Me.srt"]
+lyric_songs = ["Dancing Queen.mp3", "like a rolling Stone.mp3", "Shia LaBeouf.mp3", "Smells Like Teen Spirit.mp3", "Space Oddity.mp3", "This Is America.mp3", "Without Me.mp3", "(bowie) space oddity.mp3"]
+lyrics = ["Dancing Queen.srt", "like a rolling Stone.srt", "Shia LaBeouf.srt", "Smells Like Teen Spirit.srt", "Space Oddity.srt", "This Is America.srt", "Without Me.srt", "(bowie) space oddity.srt"]
 
 lyric_songs = [os.path.join("songs_with_lyrics", l) for l in lyric_songs]
 lyrics = [os.path.join("songs_with_lyrics", l) for l in lyrics]
-
-
 
 def hallus(style, song, **kwargs):
     time_str = time.strftime("%Y_%m_%d_%H_%M_%S", time.gmtime())
@@ -25,11 +31,86 @@ def hallus(style, song, **kwargs):
         style_name = style_name.replace(key, replace_dict[key])
     
     L = LucidSonicDream(song=song, style=style)
-    song_name = song.split(".")[0]
-    L.hallucinate(file_name=f"{time_str}_{song_name}_{style_name}.mp4", **kwargs)
+    song_name = song.split("/")[-1].split(".")[0]
+    file_name = f"{time_str}_{song_name}_{style_name}.mp4"
+    L.hallucinate(file_name=file_name, **kwargs)
+
+
+
+hallus(styles["vint_retro_scifi"], lyric_songs[7], lyrics_path=lyrics[7], batch_size=2, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.0, motion_react=0.0, lyrics_iterations=2000, reset_latents_after_phrase=1)
+
+hallus(styles["vint_retro_scifi"], lyric_songs[7], lyrics_path=lyrics[7], batch_size=2, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.0, motion_react=0.0, lyrics_iterations=2000, concat_phrases=1)
+
+
+hallus(styles["madziowa"], lyric_songs[2], lyrics_path=lyrics[2], batch_size=4, visualize_lyrics=1, no_beat=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, reset_latents_after_phrase=0, lyrics_iterations=1000)
+
+hallus(styles["madziowa"], lyric_songs[2], lyrics_path=lyrics[2], batch_size=4, visualize_lyrics=1, no_beat=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, reset_latents_after_phrase=0, lyrics_iterations=1000, concat_phrases=1)
+
+
+quit()
+
+hallus(styles["vint_retro_scifi"], lyric_songs[6], lyrics_path=lyrics[6], batch_size=4, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.4, motion_react=0.0, lyrics_iterations=1000)
+
+hallus(styles["vint_retro_scifi"], lyric_songs[6], lyrics_path=lyrics[6], batch_size=4, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.4, motion_react=0.0, reset_latents_after_phrase=0)
+
+hallus(styles["vint_retro_scifi"], lyric_songs[6], lyrics_path=lyrics[6], batch_size=4, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.4, motion_react=0.0, concat_phrases=1, reset_latents_after_phrase=0)
+    
+hallus(styles["madziowa"], lyric_songs[2], lyrics_path=lyrics[2], batch_size=4, visualize_lyrics=1, no_beat=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, reset_latents_after_phrase=0, lyrics_iterations=1000)
+
+hallus(styles["madziowa"], lyric_songs[2], lyrics_path=lyrics[2], batch_size=4, visualize_lyrics=1, no_beat=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, reset_latents_after_phrase=0, lyrics_iterations=1000, concat_phrases=1)
+    
+quit()
+    
+hallus(styles["vint_retro_scifi"], lyric_songs[6], lyrics_path=lyrics[6], batch_size=4, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.4, motion_react=0.0)
+    
+quit()
+    
+
+hallus(styles["vint_retro_scifi"], lyric_songs[4], lyrics_path=lyrics[4], batch_size=8, visualize_lyrics=1, no_beat=1, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, concat_phrases=1)
+
+hallus(styles["madziowa"], lyric_songs[2], lyrics_path=lyrics[2], batch_size=8, visualize_lyrics=1, no_beat=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1)
+hallus(styles["madziowa"], lyric_songs[2], lyrics_path=lyrics[2], batch_size=8, visualize_lyrics=1, no_beat=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, concat_phrases=1)
+hallus(styles["madziowa"], lyric_songs[2], lyrics_path=lyrics[2], batch_size=8, visualize_lyrics=1, no_beat=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, lyrics_iterations=1000)
+#eminem
+hallus(styles["vint_retro_scifi"], lyric_songs[6], lyrics_path=lyrics[6], batch_size=8, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.2, motion_react=0.0)
+quit()
+
+#hallus(styles["vint_retro_scifi"], lyric_songs[4], lyrics_path=lyrics[4], batch_size=8, visualize_lyrics=1, no_beat=1, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=0, duration=60)
+#hallus(styles["vint_retro_scifi"], lyric_songs[4], lyrics_path=lyrics[4], batch_size=8, visualize_lyrics=1, no_beat=1, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, duration=60)
+#hallus(styles["vint_retro_scifi"], lyric_songs[4], lyrics_path=lyrics[4], batch_size=8, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.1, motion_react=0.0, pulse_harmonic=1, pulse_percussive=1)
+
+#hallus(styles["astromaniacmag"], lyric_songs[4], lyrics_path=lyrics[4], batch_size=8, visualize_lyrics=1, no_beat=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7)
+
+#hallus(styles["madziowa"], lyric_songs[2], lyrics_path=lyrics[2], batch_size=8, visualize_lyrics=1, no_beat=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=9, ampl_influences_speed=1)
+#hallus(styles["therealtheory"], lyric_songs[3], lyrics_path=lyrics[3], batch_size=8, visualize_lyrics=1, no_beat=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1)
+#hallus(styles["ffhq"], lyric_songs[5], lyrics_path=lyrics[5], batch_size=8, visualize_lyrics=1, no_beat=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1)
+hallus(styles["vint_retro_scifi"], lyric_songs[6], lyrics_path=lyrics[6], batch_size=8, visualize_lyrics=1, no_beat=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1)
+hallus(styles["vint_retro_scifi"], lyric_songs[4], lyrics_path=lyrics[4], batch_size=8, visualize_lyrics=1, no_beat=1, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1)
+    
+    
+#hallus(styles["vint_retro_scifi"], lyric_songs[4], lyrics_path=lyrics[4], batch_size=8, visualize_lyrics=1, no_beat=1, duration=None, ampl_influences_speed=1)
+#hallus(styles["vint_retro_scifi"], lyric_songs[4], lyrics_path=lyrics[4], batch_size=8, visualize_lyrics=1, no_beat=1, duration=90, ampl_influences_speed=1, lyrics_sigmoid_transition=1)
+    
+    
+quit()
+
+# also just a shaky effect...
+hallus(styles["vint_retro_scifi"], lyric_songs[4], lyrics_path=lyrics[4], batch_size=8, visualize_lyrics=1, no_beat=0, duration=60, pulse_react=0.5, motion_react=0.0, pulse_harmonic=1, pulse_percussive=0)
+hallus(styles["vint_retro_scifi"], lyric_songs[4], lyrics_path=lyrics[4], batch_size=8, visualize_lyrics=1, no_beat=0, duration=60, pulse_react=0.2, motion_react=0.0, pulse_harmonic=1, pulse_percussive=0)
+
+quit()
+
+hallus(styles["vint_retro_scifi"], lyric_songs[4], lyrics_path=lyrics[4], batch_size=8, visualize_lyrics=1, no_beat=0, duration=60, pulse_react=0.5, motion_react=0.0) # baad. song has no percussion, so it just shakes a bit when the voice comes up
+hallus(styles["vint_retro_scifi"], lyric_songs[4], lyrics_path=lyrics[4], batch_size=8, visualize_lyrics=1, no_beat=0, duration=60, pulse_react=0.1, motion_react=0.0) # also bad, but nearly no effect
+hallus(styles["vint_retro_scifi"], lyric_songs[4], lyrics_path=lyrics[4], batch_size=8, visualize_lyrics=1, no_beat=0, duration=60, pulse_react=0.0, motion_react=0.5)  # really bad. the piano introduces large changes that are completely ood, so we just see bright colors 
+hallus(styles["vint_retro_scifi"], lyric_songs[4], lyrics_path=lyrics[4], batch_size=8, visualize_lyrics=1, no_beat=0, duration=60, pulse_react=0.0, motion_react=0.1) # still too strong!
+hallus(styles["vint_retro_scifi"], lyric_songs[4], lyrics_path=lyrics[4], batch_size=8, visualize_lyrics=1, no_beat=0, duration=60, pulse_react=0.1, motion_react=0.1)
+#hallus(styles["vint_retro_scifi"], lyric_songs[4], lyrics_path=lyrics[4], batch_size=8, visualize_lyrics=1, no_beat=0, duration=70)
 
     
-hallus(styles[1], lyric_songs[1], lyrics_path=lyrics[1], batch_size=4, visualize_lyrics=1)
+quit()
+    
+hallus(styles[1], lyric_songs[2], lyrics_path=lyrics[2], batch_size=4, visualize_lyrics=1)
     
 quit()
     

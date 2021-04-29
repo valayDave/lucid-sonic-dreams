@@ -106,13 +106,14 @@ class LucidSonicDream:
 
     # Define attributes
     self.song = song
+    self.song_name = song.split("/")[-1].split(".")[0].replace(".mp3", "").replace(".", "")
     self.pulse_audio = pulse_audio
     self.motion_audio = motion_audio
     self.class_audio = class_audio
     self.contrast_audio = contrast_audio
     self.flash_audio = flash_audio
     self.style = style
-    self.input_shape = input_shape or 512
+    self.input_shape = input_shape or torch.tensor([512])
     self.num_possible_classes = num_possible_classes 
     self.style_exists = False
     
@@ -217,8 +218,7 @@ class LucidSonicDream:
     
   def clmr_init(self):
     # TODO: add start and duration to song_name
-    song_name = self.song.split("/")[-1].split(".")[0].replace(".mp3", "").replace(".", "")
-    song_name = f"{song_name}_{self.start}_{self.duration}_{self.fps}"
+    song_name = f"{self.song_name}_{self.start}_{self.duration}_{self.fps}"
     song_preds_path = f"clmr_{song_name}_preds.pt"
     
     if os.path.exists(song_preds_path):
@@ -429,7 +429,7 @@ class LucidSonicDream:
     self.noise = torch.stack([(pred.view(len(latents), 1, 1) * latents).sum(dim=0) for pred in smoothed]).numpy()
 
     
-    #self.input_shape = latents[0].unsqueeze(0).shape    
+    self.input_shape = latents[0].unsqueeze(0).shape    
 
 
   def extract_lyrics_meaning(self, lyrics_path):
@@ -444,6 +444,9 @@ class LucidSonicDream:
     ♪♪ OBIE TRICE
     REAL NAME NO GIMMICKS... ♪
     """
+    sys.path.append("../StyleCLIP_modular")
+
+    
     def time_str_to_seconds(time_str):
         hrs_str = time_str.split(":")[0]
         min_str = time_str.split(":")[1]
@@ -459,11 +462,13 @@ class LucidSonicDream:
     texts = []
     start_times = []
     end_times = []
-    while len(lines) > 0:
-        #print("next lines")
-        #print(lines[0].strip("\n"))
-        #print(lines[1].strip("\n"))
-        #print(lines[2].strip("\n"))
+    while len(lines) > 2:
+        if lines[0] == "\n":
+            continue
+        print("next lines")
+        print(lines[0].strip("\n"))
+        print(lines[1].strip("\n"))
+        print(lines[2].strip("\n"))
         count = 4
         # read times
         start_time_str = lines[1].split(" ")[0]
@@ -474,7 +479,7 @@ class LucidSonicDream:
 
         # read text
         text = lines[2].strip("♪.\n")
-        if lines[3] != "\n":
+        if len(lines) > 3 and lines[3] != "\n":
             text += " " + lines[3].strip("♪.\n")
             count += 1
             if lines[4] != "\n":
@@ -487,7 +492,7 @@ class LucidSonicDream:
         while text.find("<") != -1:
             start = text.find("<")
             end = text.find(">")
-            text = text[:start] + c[end + 1:]
+            text = text[:start] + text[end + 1:]
         # remove spaces and turn to lower-case
         text = text.strip("♪ .\n").lower()
 
@@ -503,6 +508,28 @@ class LucidSonicDream:
     #print(start_times[:5])
     #print(end_times[:5])
     
+    # for each phrase, as add many previous words as long as it still fits into the context length
+    phrases = texts
+    if self.concat_phrases:
+        from style_clip.clip import tokenize
+
+        context_length = 77 #imagine.perceptor.context_length
+
+        phrases = []
+        current_phrase = ""
+        for phrase in texts:
+            current_phrase += " \n " + phrase
+            # while the sentence is too long, eliminate the first word. subtract 2 from context length for start and end token
+            is_too_long = True
+            while is_too_long:
+                try:
+                    tokens = tokenize(current_phrase, context_length=context_length)
+                    is_too_long = False
+                except RuntimeError:
+                    # tokenizer throws RuntimeError if text is too long
+                    current_phrase = " ".join(current_phrase.split(" ")[1:])
+            phrases.append(current_phrase)
+    
     # calc some stats about the song
     frame_duration = self.frame_duration
     num_frames = np.ceil(len(self.wav) / frame_duration)
@@ -510,14 +537,12 @@ class LucidSonicDream:
     latent_folder = "lyric_latents"
     os.makedirs(latent_folder, exist_ok=True)
     style = self.style.split("/")[-1].split(".")[0].replace(".pkl", "").replace(".", "")
-    iterations = 20
-    latent_path = f"{latent_folder}/lyrics_{style}_latents_it{iterations}.pt"
+    iterations = self.lyrics_iterations
+    latent_path = f"{latent_folder}/{self.song_name}_lyrics_{style}_latents_it{iterations}{'_concatphrases' if self.concat_phrases else ''}{'' if self.reset_latents_after_phrase else '_noLatReset'}.pt"
     print("Latents at: ", latent_path)
     if os.path.exists(latent_path):
         latents = torch.load(latent_path)
     else:
-        sys.path.append("../StyleCLIP_modular")
-
         from style_clip import Imagine
         imagine = Imagine(
                 save_progress=False,
@@ -531,10 +556,10 @@ class LucidSonicDream:
                 batch_size=32,
                 style=self.style,
         )
-
+        
         # calc latents for each phrase
-        latents = {}
-        for phrase in tqdm(set(texts), position=0):
+        latents = {"song_start_latent": imagine.model.model.w_opt.detach().cpu()}
+        for phrase in tqdm(phrases, position=0):
             tqdm.write(phrase)
             imagine.set_clip_encoding(text=phrase)
             # train
@@ -543,29 +568,103 @@ class LucidSonicDream:
             w_opt = imagine.model.model.w_opt.detach().cpu()
             latents[phrase] = w_opt
             # reset
-            imagine.reset()
+            if self.reset_latents_after_phrase:
+                imagine.reset()
         # save latents
         torch.save(latents, latent_path)
         
-    # assign latents to frames
-    noise = []
-    print(num_frames)
-    print(frame_duration)
-    for i in range(int(num_frames)):
-        print(i)
-        print(i / self.fps)
-        print(end_times[0])
-        print()
-        current_text = texts[0]
-        current_latent = latents[current_text]
-        noise.append(current_latent.squeeze().numpy())
+    #song_minutes = librosa.get_duration(self.wav, self.sr)
+    #song_seconds = song_minutes * 60
+
+    # smooth spectral norm for smoother transitions
+    spec_norm = self.spec_norm_class
+    ema_val = 0.75
+    ema_spec_norm = []
+    val = spec_norm[0]
+    for amp in spec_norm:
+        val = amp * (1 - ema_val) + ema_val * val
+        ema_spec_norm.append(val)
         
-        if len(end_times) > 1:
-            if i / self.fps > end_times[0]:
-                del end_times[0]
-                del texts[0]
+    def minmax(a):
+        return (a - a.min()) / (a.max() - a.min())
+    # calc minmax vals for sigmoid
+    temp_vec = torch.arange(0, 10000) / 10000
+    temp_vec_sig = torch.sigmoid((temp_vec - 0.5) * self.lyrics_sigmoid_t)
+    sig_min, sig_max = temp_vec_sig.min(), temp_vec_sig.max()
+    
+    # calc mid times
+    mid_times = [(end_times[i] * 3 + start_times[i] * 1) / 4 for i in range(len(end_times))]
+    
+    # assign latents to frames
+    start_latent = latents["song_start_latent"]
+    current_latent = start_latent
+    next_latent = latents[phrases[0]]
+    next_mid_time = mid_times[0]
+    mid_time_to_mid_time = mid_times[0]
+    steps_to_next = int(np.ceil(mid_time_to_mid_time * self.fps))
+    current_step = 0
+    ampl_sum = sum(ema_spec_norm[: steps_to_next])
+    ampl_cumsum = 0
+    noise = []
+    print("Num frames. ", num_frames)
+    print("First num steps to next mid of phrase: ", steps_to_next)
+    print("Ampl sum start: ", ampl_sum)
+    fracs_before_sig = []
+    fracs = []
+    for i in range(int(num_frames)):
+        current_time = i / self.fps
+        #fraction_to_next = (next_mid_time - current_time) / mid_time_to_mid_time
+        fraction_to_next = 1 - (current_step / steps_to_next)
+        current_step += 1
+        
+        fracs_before_sig.append(fraction_to_next)
+        
+        if self.ampl_influences_speed:
+            ampl_cumsum += ema_spec_norm[i]
+            fraction_to_next = 1 - (ampl_cumsum / ampl_sum)
+            
+            
+        # instead of linear make it a sigmoid such that the space around the text latents is explored for longer
+        if self.lyrics_sigmoid_transition:
+            # apply sigmoid
+            fraction_to_next = torch.sigmoid((torch.tensor(fraction_to_next) - 0.5) * self.lyrics_sigmoid_t).item()
+            # norm sigmoid to span between 0 and 1
+            fraction_to_next = (fraction_to_next - sig_min) / (sig_max - sig_min)
+            fracs.append(fraction_to_next)
+            
+        interpolated_latent = current_latent * fraction_to_next + next_latent * (1 - fraction_to_next)
+        
+        noise.append(interpolated_latent.squeeze().numpy())
+        
+        if len(mid_times) > 1:
+            if current_time > mid_times[0]:
+                current_text = phrases[0]
+                current_latent = latents[current_text]
+                
+                next_mid_time = mid_times[1]
+                mid_time_to_mid_time = next_mid_time - mid_times[0]
+                
+                next_latent = latents[phrases[1]]
+        
+                steps_to_next = int(np.ceil(mid_time_to_mid_time * self.fps))
+                current_step = 0
+                ampl_sum = sum(ema_spec_norm[i: i + steps_to_next])
+                ampl_cumsum = 0
+                del mid_times[0]
+                del phrases[0]
+        elif current_time > mid_times[0]:
+            # for last image, just show constant frame
+            current_text = phrases[0]
+            current_latent = latents[current_text]
+
+            next_mid_time = mid_times[0]
+            mid_time_to_mid_time = 1
+
+            next_latent = current_latent
     self.noise = np.array(noise)
     print("Noise shape: ", self.noise.shape)
+    self.input_shape = start_latent.shape
+
     
 
   def load_specs(self):
@@ -691,7 +790,6 @@ class LucidSonicDream:
     # the first point in time where at least one pitch > 0 
     # (controls for silence at the start of a track)
     if len(class_vecs) == 0:
-
       first_chrom = chrom_class[:,np.min(np.where(chrom_class.sum(axis=0) > 0))]
       update_dict = dict(zip(classes, first_chrom))
       class_vec = np.array([update_dict.get(i) \
@@ -701,7 +799,6 @@ class LucidSonicDream:
     
     # For succeeding vectors, update class values scaled by class_pitch_react
     else:
-
       update_dict = dict(zip(classes, chrom_class[:,frame]))
       class_vec = class_vecs[frame - 1] +\
                   class_pitch_react * \
@@ -765,11 +862,9 @@ class LucidSonicDream:
     if self.use_clmr:
         noise = self.noise
         self.class_vecs = noise
-        return
     elif self.visualize_lyrics:
         noise = self.noise
         self.class_vecs = noise
-        return
     else:
         if num_init_noise < 2:
             noise = [self.truncation * truncnorm.rvs(-2, 2, size=(1, self.input_shape)).astype(np.float32)[0]] * \
@@ -789,6 +884,8 @@ class LucidSonicDream:
           noise = full_frame_interpolation(init_noise, 
                                            steps,
                                            len(self.spec_norm_class))
+    if self.no_beat:
+        return
     print("noise len: ", len(noise))
     # Initialize lists of Pulse, Motion, and Class vectors
     pulse_noise = []
@@ -796,16 +893,16 @@ class LucidSonicDream:
     self.class_vecs = []
 
     # Initialize "base" vectors based on Pulse/Motion Reactivity values
-    pulse_base = np.ones_like(self.input_shape) * self.pulse_react  #  np.array([self.pulse_react] * self.input_shape)
-    motion_base = np.ones_like(self.input_shape) * motion_react  # np.array([motion_react] * self.input_shape)
-
+    pulse_base = np.ones(self.input_shape) * self.pulse_react  #  np.array([self.pulse_react] * self.input_shape)
+    motion_base = np.ones(self.input_shape) * motion_react  # np.array([motion_react] * self.input_shape)
+    
     # Randomly initialize "update directions" of noise vectors
-    self.motion_signs = np.array([random.choice(1, -1) for _ in range(len(self.input_shape.flatten()))]).reshape(self.input_shape)
+    self.motion_signs = np.array([random.choice([1, -1]) for _ in range(self.input_shape.numel())]).reshape(self.input_shape)
     #self.motion_signs = np.array([random.choice([1,-1]) \
     #                              for n in range(self.input_shape)])
 
     # Randomly initialize factors based on motion_randomness
-    rand_factors = np.array([random.choice(1, 1 - self.motion_randomness) for _ in range(len(self.input_shape.flatten()))]).reshape(self.input_shape)
+    rand_factors = np.array([random.choice([1, 1 - self.motion_randomness]) for _ in range(self.input_shape.numel())]).reshape(self.input_shape)
     #rand_factors = np.array([random.choice([1, 1 - self.motion_randomness]) \
     #                         for n in range(self.input_shape)])
 
@@ -816,12 +913,13 @@ class LucidSonicDream:
 
       # Re-initialize randomness factors every 4 seconds
       if i % round(fps * 4) == 0:
-        rand_factors = np.array([random.choice(1, 1 - self.motion_randomness) for _ in range(len(self.input_shape.flatten()))]).reshape(self.input_shape)
+        rand_factors = np.array([random.choice([1, 1 - self.motion_randomness]) for _ in range(self.input_shape.numel())]).reshape(self.input_shape)
         #rand_factors = np.array([random.choice([1, 1 - self.motion_randomness]) \
         #                     for n in range(self.input_shape)])
 
       # Generate incremental update vectors for Pulse and Motion
       pulse_noise_add = pulse_base * self.spec_norm_pulse[i]
+      #print(motion_base, self.spec_norm_motion[i], self.motion_signs.shape, rand_factors.shape)
       motion_noise_add = motion_base * self.spec_norm_motion[i] * \
                          self.motion_signs * rand_factors
 
@@ -1040,7 +1138,8 @@ class LucidSonicDream:
                   flash_percussive: bool = None,
                   custom_effects: list = None,
                   truncation_psi: float = 1.0,
-                  max_frames_in_mem: int = 1000,
+                  max_frames_in_mem: int = 500,
+                  no_beat: int = 0,
                   
                   use_clmr=False,
                   clmr_softmax=False,
@@ -1049,6 +1148,12 @@ class LucidSonicDream:
                   
                   visualize_lyrics=0,
                   lyrics_path=None,
+                  ampl_influences_speed=0,
+                  lyrics_sigmoid_transition=0,
+                  lyrics_sigmoid_t=8,  # scaling of sigmoid, should be between 5 and 10, the stronger, the quicker the changes between phrases
+                  concat_phrases=0,
+                  lyrics_iterations=200,
+                  reset_latents_after_phrase=1,
                  ):
     '''Full pipeline of video generation'''
 
@@ -1094,6 +1199,7 @@ class LucidSonicDream:
     self.flash_percussive = flash_percussive
     self.custom_effects = custom_effects 
     self.max_frames_in_mem = max_frames_in_mem
+    self.no_beat = no_beat
     # stylegan2 params
     self.truncation_psi = truncation_psi
     # clmr params
@@ -1103,6 +1209,12 @@ class LucidSonicDream:
     self.clmr_ema = clmr_ema
     # lyrics params
     self.visualize_lyrics = visualize_lyrics
+    self.ampl_influences_speed = ampl_influences_speed
+    self.lyrics_sigmoid_transition = lyrics_sigmoid_transition
+    self.lyrics_sigmoid_t = lyrics_sigmoid_t
+    self.concat_phrases = concat_phrases
+    self.lyrics_iterations = lyrics_iterations
+    self.reset_latents_after_phrase = reset_latents_after_phrase
 
     # Initialize style
     if not self.style_exists:
