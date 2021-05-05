@@ -10,7 +10,7 @@ styles = {"janregnar": "../stylegan2-ada-pytorch/jan_regnart_640.pkl",
           "microscope": "microscope images", 
           "imagenet": "imagenet", 
           "ffhq": "faces (ffhq config-f)", 
-          "Visionaryart": "../stylegan2-ada-pytorch/VisionaryArt.pkl", 
+          "visionaryart": "../stylegan2-ada-pytorch/VisionaryArt.pkl", 
           "astromaniacmag": "../stylegan2-ada-pytorch/astromaniacmag_160.pkl",
           "vint_retro_scifi": "../stylegan2-ada-pytorch/vint_retro_scifi_3200_2map.pkl",
           "therealtheory": "../stylegan2-ada-pytorch/therealtheory_540.pkl"}
@@ -18,7 +18,7 @@ styles = {"janregnar": "../stylegan2-ada-pytorch/jan_regnart_640.pkl",
 songs = ["songs/henne_song.mp3", "songs/gnossi_1.mp3"]
 
 lyric_songs = ["Dancing Queen.mp3", "like a rolling Stone.mp3", "Shia LaBeouf.mp3", "Smells Like Teen Spirit.mp3", "Space Oddity.mp3", "This Is America.mp3", "Without Me.mp3", "(bowie) space oddity.mp3"]
-lyrics = ["Dancing Queen.srt", "like a rolling Stone.srt", "Shia LaBeouf.srt", "Smells Like Teen Spirit.srt", "Space Oddity.srt", "This Is America.srt", "Without Me.srt", "(bowie) space oddity.srt"]
+lyrics = ["Dancing Queen.srt", "like a rolling Stone.srt", "Shia LaBeouf.srt", "Smells Like Teen Spirit.srt", "Space Oddity.srt", "This Is America.srt", "Without Me.srt", "(bowie) space oddity.srt", "space_oddity_bowie_custom_1.srt"]
 
 lyric_songs = [os.path.join("songs_with_lyrics", l) for l in lyric_songs]
 lyrics = [os.path.join("songs_with_lyrics", l) for l in lyrics]
@@ -35,14 +35,66 @@ def hallus(style, song, **kwargs):
     file_name = f"{time_str}_{song_name}_{style_name}.mp4"
     L.hallucinate(file_name=file_name, **kwargs)
 
+    
+hallus(styles["vint_retro_scifi"], lyric_songs[7], lyrics_path=lyrics[8], batch_size=4, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.3, motion_react=0.0, lyrics_iterations=3000, reset_latents_after_phrase=1)
+
+quit()
+    
+#hallus(styles["vint_retro_scifi"], lyric_songs[0], lyrics_path=lyrics[0], batch_size=4, visualize_lyrics=0, no_beat=0, duration=10, pulse_react=0.2, motion_react=0.1, cluster_pitches=None, use_all_layers=0)
+
+    
+hallus(styles["vint_retro_scifi"], lyric_songs[0], lyrics_path=lyrics[0], batch_size=4, visualize_lyrics=0, no_beat=0, duration=10, pulse_react=0.0, motion_react=300.0, cluster_pitches=None, speed_fpm=0)
+
+quit()
+    
+#hallus(styles["vint_retro_scifi"], lyric_songs[0], lyrics_path=lyrics[0], batch_size=4, visualize_lyrics=0, no_beat=0, duration=60, pulse_react=0.5, motion_react=0.5, cluster_pitches="spectral")
+
+#hallus(styles["vint_retro_scifi"], lyric_songs[0], lyrics_path=lyrics[0], batch_size=4, visualize_lyrics=0, no_beat=0, duration=60, pulse_react=0.5, motion_react=0.5, cluster_pitches="chroma_cqt")
+
+#hallus(styles["vint_retro_scifi"], lyric_songs[0], lyrics_path=lyrics[0], batch_size=4, visualize_lyrics=0, no_beat=0, duration=60, pulse_react=0.5, motion_react=0.5, cluster_pitches="chroma_stft")
+
+hallus(styles["vint_retro_scifi"], lyric_songs[0], lyrics_path=lyrics[0], batch_size=4, visualize_lyrics=0, no_beat=0, duration=30, pulse_react=0.3, motion_react=0.3, cluster_pitches=None)
+
+hallus(styles["vint_retro_scifi"], lyric_songs[0], lyrics_path=lyrics[0], batch_size=4, visualize_lyrics=0, no_beat=0, duration=30, pulse_react=0.3, motion_react=0.1, cluster_pitches=None)
+
+hallus(styles["vint_retro_scifi"], lyric_songs[0], lyrics_path=lyrics[0], batch_size=4, visualize_lyrics=0, no_beat=0, duration=30, pulse_react=0.3, motion_react=0.05, cluster_pitches=None)
+
+hallus(styles["vint_retro_scifi"], lyric_songs[0], lyrics_path=lyrics[0], batch_size=4, visualize_lyrics=0, no_beat=0, duration=30, pulse_react=0.3, motion_react=0.3, cluster_pitches=None, truncation=0.5)
+
+hallus(styles["vint_retro_scifi"], lyric_songs[0], lyrics_path=lyrics[0], batch_size=4, visualize_lyrics=0, no_beat=0, duration=30, pulse_react=0.3, motion_react=0.3, cluster_pitches=None, truncation=0.3)
+
+hallus(styles["vint_retro_scifi"], lyric_songs[0], lyrics_path=lyrics[0], batch_size=4, visualize_lyrics=0, no_beat=0, duration=30, pulse_react=0.3, motion_react=0.3, cluster_pitches=None, truncation=0.1)
+
+    
+quit()
+    
+    
+hallus(styles["visionaryart"], lyric_songs[0], lyrics_path=lyrics[0], batch_size=4, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, reset_latents_after_phrase=1, lyrics_iterations=1000, pulse_react=0.3, motion_react=0.0)
 
 
-hallus(styles["vint_retro_scifi"], lyric_songs[7], lyrics_path=lyrics[7], batch_size=2, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.0, motion_react=0.0, lyrics_iterations=2000, reset_latents_after_phrase=1)
+hallus(styles["visionaryart"], lyric_songs[0], lyrics_path=lyrics[0], batch_size=4, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, reset_latents_after_phrase=0, lyrics_iterations=1000, pulse_react=0.3, motion_react=0.0)
 
-hallus(styles["vint_retro_scifi"], lyric_songs[7], lyrics_path=lyrics[7], batch_size=2, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.0, motion_react=0.0, lyrics_iterations=2000, concat_phrases=1)
+hallus(styles["visionaryart"], lyric_songs[0], lyrics_path=lyrics[0], batch_size=4, visualize_lyrics=1, no_beat=0, duration=60, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, reset_latents_after_phrase=1, lyrics_iterations=1000, pulse_react=0.3, motion_react=0.1)
 
+hallus(styles["visionaryart"], lyric_songs[0], lyrics_path=lyrics[0], batch_size=4, visualize_lyrics=1, no_beat=0, duration=60, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, reset_latents_after_phrase=1, lyrics_iterations=1000, pulse_react=0.3, motion_react=0.05)
+
+hallus(styles["visionaryart"], lyric_songs[0], lyrics_path=lyrics[0], batch_size=4, visualize_lyrics=1, no_beat=0, duration=60, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, reset_latents_after_phrase=1, lyrics_iterations=1000, pulse_react=0.3, motion_react=0.01)
+
+
+
+
+
+
+quit()
 
 hallus(styles["madziowa"], lyric_songs[2], lyrics_path=lyrics[2], batch_size=4, visualize_lyrics=1, no_beat=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, reset_latents_after_phrase=0, lyrics_iterations=1000)
+
+#hallus(styles["vint_retro_scifi"], lyric_songs[7], lyrics_path=lyrics[7], batch_size=2, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.0, motion_react=0.0, lyrics_iterations=2000, reset_latents_after_phrase=1)
+
+#hallus(styles["vint_retro_scifi"], lyric_songs[7], lyrics_path=lyrics[7], batch_size=2, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.0, motion_react=0.0, lyrics_iterations=2000, concat_phrases=1)
+
+
+#hallus(styles["madziowa"], lyric_songs[2], lyrics_path=lyrics[2], batch_size=4, visualize_lyrics=1, no_beat=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, reset_latents_after_phrase=0, lyrics_iterations=1000)
 
 hallus(styles["madziowa"], lyric_songs[2], lyrics_path=lyrics[2], batch_size=4, visualize_lyrics=1, no_beat=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, reset_latents_after_phrase=0, lyrics_iterations=1000, concat_phrases=1)
 
