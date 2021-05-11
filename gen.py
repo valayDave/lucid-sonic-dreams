@@ -38,6 +38,7 @@ def hallus(style, song, height=496, width=496, model_type="stylegan", **kwargs):
     file_name = f"{time_str}_{song_name}_{style_name}.mp4"
     L.hallucinate(file_name=file_name, **kwargs)
 
+
 # stylegan test
 #hallus(styles["vint_retro_scifi"], lyric_songs[7], lyrics_path=lyrics[8], batch_size=4, duration=20, pulse_react=0.3, motion_react=0.3)
 # vqgan no lyrics
@@ -45,7 +46,10 @@ def hallus(style, song, height=496, width=496, model_type="stylegan", **kwargs):
 # with lyrics
 #hallus(styles["vint_retro_scifi"], lyric_songs[7], lyrics_path=lyrics[8], batch_size=1, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.3, motion_react=0.0, lyrics_iterations=50, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0)
 
-hallus(styles["vint_retro_scifi"], lyric_songs[7], lyrics_path=lyrics[8], batch_size=1, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.6, motion_react=0.0, lyrics_iterations=1000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0)
+
+hallus(None, lyric_songs[7], lyrics_path=lyrics[7], batch_size=4, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=1.2, motion_react=0.0, lyrics_iterations=2000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0)
+
+#hallus(styles["vint_retro_scifi"], lyric_songs[7], lyrics_path=lyrics[8], batch_size=1, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7.5, ampl_influences_speed=1, pulse_react=0.6, motion_react=0.0, lyrics_iterations=3000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0)
 
 quit()
 
