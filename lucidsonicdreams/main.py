@@ -1108,7 +1108,8 @@ class LucidSonicDream:
         
 
   def hallucinate(self,
-                  file_name: str, 
+                  file_name: str,
+                  output_dir: str,
                   output_audio: str = None,
                   fps: int = 43, 
                   resolution: int = None, 
@@ -1185,6 +1186,9 @@ class LucidSonicDream:
 
     self.file_name = file_name if file_name[-4:] == '.mp4' else file_name + '.mp4'
     self.file_name = self.file_name.split("/")[-1].replace(" ", "_")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    self.output_dir = output_dir
     self.resolution = resolution
     self.batch_size = batch_size
     self.speed_fpm = speed_fpm
@@ -1310,7 +1314,7 @@ class LucidSonicDream:
     audio = mpy.AudioFileClip('tmp.wav', fps=self.sr * 2)
     video = mpy.ImageSequenceClip(self.frames_dir, fps=self.sr / self.frame_duration)
     video = video.set_audio(audio)
-    video.write_videofile(self.file_name, audio_codec='aac')
+    video.write_videofile(os.path.join(self.output_dir, self.file_name), audio_codec='aac', fps=self.fps)
 
     # Delete temporary audio file
     os.remove('tmp.wav')
