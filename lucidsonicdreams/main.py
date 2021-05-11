@@ -960,8 +960,7 @@ class LucidSonicDream:
       # Update directions
       motion_signs = self.update_motion_signs(motion_signs, current_noise, z_dim_std)
 
-    # convert to numpy array:
-    #self.noise = np.array(noise)    
+    self.noise = noise 
 
   def setup_effects(self):
     '''Initializes effects to be applied to each frame'''
