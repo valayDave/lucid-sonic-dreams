@@ -13,7 +13,8 @@ styles = {"janregnar": "../stylegan2-ada-pytorch/jan_regnart_640.pkl",
           "visionaryart": "../stylegan2-ada-pytorch/VisionaryArt.pkl", 
           "astromaniacmag": "../stylegan2-ada-pytorch/astromaniacmag_160.pkl",
           "vint_retro_scifi": "../stylegan2-ada-pytorch/vint_retro_scifi_3200_2map.pkl",
-          "therealtheory": "../stylegan2-ada-pytorch/therealtheory_540.pkl"}
+          "therealtheory": "../stylegan2-ada-pytorch/therealtheory_540.pkl",
+          "floor_plans": "models/floor-plans_stylegan2.pkl"}
 
 songs = ["songs/henne_song.mp3", "songs/gnossi_1.mp3"]
 
@@ -23,7 +24,7 @@ lyrics = ["Dancing Queen.srt", "like a rolling Stone.srt", "Shia LaBeouf.srt", "
 lyric_songs = [os.path.join("songs_with_lyrics", l) for l in lyric_songs]
 lyrics = [os.path.join("songs_with_lyrics", l) for l in lyrics]
 
-def hallus(style, song, height=496, width=496, model_type="stylegan", **kwargs):
+def hallus(style, song, height=496, width=496, model_type="stylegan", output_dir="outputs", **kwargs):
     time_str = time.strftime("%Y_%m_%d_%H_%M_%S", time.gmtime())
     if model_type == "stylegan":
         style_name = style.split("/")[-1]
@@ -36,18 +37,41 @@ def hallus(style, song, height=496, width=496, model_type="stylegan", **kwargs):
     L = LucidSonicDream(song=song, style=style, height=height, width=width, model_type=model_type)
     song_name = song.split("/")[-1].split(".")[0]
     file_name = f"{time_str}_{song_name}_{style_name}.mp4"
-    L.hallucinate(file_name=file_name, **kwargs)
 
+    L.hallucinate(file_name=file_name, output_dir=output_dir, **kwargs)
 
+    
+clip_opt_kwargs = {"latent_type": "code_sampling"}
+hallus(None, lyric_songs[7], width=480, height=480, lyrics_path=lyrics[8], batch_size=2, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.15, motion_react=0.00, lyrics_iterations=1000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0, no_beat=0, clip_opt_kwargs=clip_opt_kwargs)
+clip_opt_kwargs = {"circular": 1}
+hallus(None, lyric_songs[7], width=480, height=480, lyrics_path=lyrics[8], batch_size=2, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.15, motion_react=0.00, lyrics_iterations=1000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0, no_beat=0, clip_opt_kwargs=clip_opt_kwargs)
+clip_opt_kwargs = None
+hallus(None, lyric_songs[7], width=480, height=480, lyrics_path=lyrics[8], batch_size=2, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.15, motion_react=0.00, lyrics_iterations=1000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0, no_beat=0, clip_opt_kwargs=clip_opt_kwargs)
+
+quit()
+
+#hallus(None, lyric_songs[7], width=480, height=480, lyrics_path=lyrics[8], batch_size=2, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.15, motion_react=0.00, lyrics_iterations=1000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0, no_beat=0)
+
+#hallus(None, lyric_songs[7], width=480, height=480, lyrics_path=lyrics[7], batch_size=2, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.1, motion_react=0.03, lyrics_iterations=2000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0)
+
+    
+#cluster_pitches: "spectral","chroma_cqt", "chroma_stft
+#hallus(styles["vint_retro_scifi"], songs[1], batch_size=4, duration=30, pulse_react=0.1, motion_react=0.05, use_all_layers=1, cluster_pitches="chroma_stft", start=10)
+#hallus(styles["vint_retro_scifi"], songs[1], batch_size=4, duration=30, pulse_react=0.1, motion_react=0.05, use_all_layers=1, cluster_pitches="spectral", start=10)
+#hallus(styles["vint_retro_scifi"], songs[1], batch_size=4, duration=30, pulse_react=0.1, motion_react=0.05, use_all_layers=1, cluster_pitches="chroma_cqt", start=10)
+
+    
 # stylegan test
-#hallus(styles["vint_retro_scifi"], lyric_songs[7], lyrics_path=lyrics[8], batch_size=4, duration=20, pulse_react=0.3, motion_react=0.3)
+#hallus(styles["vint_retro_scifi"], lyric_songs[0], batch_size=4, duration=10, pulse_react=0.1, motion_react=0.05, use_all_layers=0)
+#hallus(styles["vint_retro_scifi"], lyric_songs[0], batch_size=4, duration=10, pulse_react=0.1, motion_react=0.05, use_all_layers=1)
+
 # vqgan no lyrics
-#hallus(styles["vint_retro_scifi"], lyric_songs[0], batch_size=1, duration=20, pulse_react=0.5, motion_react=0.5, model_type="vqgan")
+#hallus(styles["vint_retro_scifi"], lyric_songs[0], batch_size=1, duration=10, pulse_react=0.1, motion_react=0.05, model_type="vqgan")
 # with lyrics
 #hallus(styles["vint_retro_scifi"], lyric_songs[7], lyrics_path=lyrics[8], batch_size=1, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.3, motion_react=0.0, lyrics_iterations=50, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0)
+quit()
 
-
-hallus(None, lyric_songs[7], lyrics_path=lyrics[7], batch_size=4, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=1.2, motion_react=0.0, lyrics_iterations=2000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0)
+hallus(None, lyric_songs[7], width=480, height=480, lyrics_path=lyrics[7], batch_size=4, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=1.2, motion_react=0.0, lyrics_iterations=2000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0)
 
 #hallus(styles["vint_retro_scifi"], lyric_songs[7], lyrics_path=lyrics[8], batch_size=1, visualize_lyrics=1, no_beat=0, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7.5, ampl_influences_speed=1, pulse_react=0.6, motion_react=0.0, lyrics_iterations=3000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0)
 
@@ -264,3 +288,4 @@ hallus(styles[-1], duration=60, start=210, batch_size=4)
 hallus(styles[-1], duration=60, start=210, batch_size=16)
 hallus(styles[-1], pulse_react=1.2, motion_react=0.7)
 
+hallus(styles["floor_plans"], lyric_songs[-1], duration=10, batch_size=2, pulse_react=0.55, motion_react=1.0, fps=42, speed_fpm=1)

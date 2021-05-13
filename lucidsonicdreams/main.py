@@ -548,10 +548,13 @@ class LucidSonicDream:
     latent_folder = "lyric_latents"
     lyrics_name = lyrics_path.split("/")[-1].split(".")[0].replace(" ", "_").replace(")", "").replace("(", "")
     os.makedirs(latent_folder, exist_ok=True)
+    if self.clip_opt_kwargs is None:
+        self.clip_opt_kwargs = {}
     if self.model_type == "stylegan":
         style = self.style.split("/")[-1].split(".")[0].replace(".pkl", "").replace(".", "")
     elif self.model_type == "vqgan":
-        style = f"vqgan{self.width}x{self.height}"
+        kwargs_str = "_".join([f"{key}{self.clip_opt_kwargs[key]}" for key in self.clip_opt_kwargs])
+        style = f"vqgan{self.width}x{self.height}" + kwargs_str
     iterations = self.lyrics_iterations
     latents_path = f"{latent_folder}/{lyrics_name}_lyrics_{style}_latents_it{iterations}{'_concatphrases' if self.concat_phrases else ''}{'' if self.reset_latents_after_phrase else '_noLatReset'}"
     os.makedirs(latents_path, exist_ok=True)
@@ -570,6 +573,9 @@ class LucidSonicDream:
             style=self.style,
             model_type=self.model_type,
             verbose=0,
+            sideX=self.width,
+            sideY=self.height,
+            **self.clip_opt_kwargs,
     )
 
     # calc latents for each phrase, load the ones that are already calculated
@@ -707,24 +713,24 @@ class LucidSonicDream:
     motion_bools_equal = motion_percussive == motion_harmonic
 
     if aud_unassigned and not all([pulse_bools_equal, motion_bools_equal]):
-       wav_harm, wav_perc = librosa.effects.hpss(wav)
-       wav_list = [wav, wav_harm, wav_perc]
+        wav_harm, wav_perc = librosa.effects.hpss(wav)
+        wav_list = [wav, wav_harm, wav_perc]
 
-       pulse_bools = [pulse_bools_equal, pulse_harmonic, pulse_percussive]
-       wav_pulse = wav_list[pulse_bools.index(max(pulse_bools))]
+        pulse_bools = [pulse_bools_equal, pulse_harmonic, pulse_percussive]
+        wav_pulse = wav_list[pulse_bools.index(max(pulse_bools))]
 
-       motion_bools = [motion_bools_equal, motion_harmonic, motion_percussive]
-       wav_motion = wav_list[motion_bools.index(max(motion_bools))]
+        motion_bools = [motion_bools_equal, motion_harmonic, motion_percussive]
+        wav_motion = wav_list[motion_bools.index(max(motion_bools))]
 
     # Load audio signal data for Pulse, Motion, and Class if provided
     if self.pulse_audio:
-      wav_pulse, sr_pulse = librosa.load(self.pulse_audio, offset=start, 
+        wav_pulse, sr_pulse = librosa.load(self.pulse_audio, offset=start, 
                                          duration=duration)
     if self.motion_audio:
-      wav_motion, sr_motion = librosa.load(self.motion_audio, offset=start, 
+        wav_motion, sr_motion = librosa.load(self.motion_audio, offset=start, 
                                            duration=duration)
     if self.class_audio:
-      wav_class, sr_class = librosa.load(self.class_audio, offset=start,
+        wav_class, sr_class = librosa.load(self.class_audio, offset=start,
                                          duration=duration)
     
     # Calculate frame duration (i.e. samples per frame)
@@ -844,22 +850,48 @@ class LucidSonicDream:
     num_init_noise = round(minutes / 60 * self.speed_fpm)
     num_total_frames = len(self.spec_norm_class)
     
-    # if we sample in the model latent space, find the std per layer per feature
-    if self.use_all_layers:
-        z = torch.tensor([truncnorm.rvs(-2, 2, size=512) for _ in range(10000)], device=self.device)
+    # if we sample in the model latent space, find the std per feature
+    shape = self.input_shape.tolist()
+    if self.model_type == "vqgan":
+        #def sample_func(shape):
+        #    return torch.zeros(shape).normal_(0., 4.).numpy()
+        def sample_func(shape):
+            vqgan = self.model.model
+            vocab_size = vqgan.quantize.n_e
+            code_b = torch.randint(0, vocab_size, (shape[1] * shape[2],), device=self.device)
+            encoded = vqgan.quantize.get_codebook_entry(code_b, None)
+            encoded = encoded.permute(1, 0).reshape(shape).cpu().numpy()
+            return encoded
+        
+        w_samples = np.array([sample_func(shape) for _ in range(1000)])
+        z_dim_std = w_samples.std(axis=0)
+    elif self.use_all_layers:
+        def sample_func(shape):
+            z = torch.tensor([truncnorm.rvs(-2, 2, size=512)], device=self.device)
+            with torch.no_grad():
+                w_samples = self.model.mapping(z, None, truncation_psi=self.truncation_psi).cpu()
+            return w_samples.squeeze().numpy()
+        #z = torch.tensor([truncnorm.rvs(-2, 2, size=512) for _ in range(10000)], device=self.device)
         #z = torch.from_numpy(np.random.RandomState(1).randn(10000, 512)).to(self.device)
-        with torch.no_grad():
-            w_samples = self.model.mapping(z, None, truncation_psi=self.truncation_psi).cpu()
-        all_std = w_samples.std(dim=0)
-        mean_layer_std = all_std.mean(dim=1)[0]
+        #with torch.no_grad():
+        #    w_samples = self.model.mapping(z, None, truncation_psi=self.truncation_psi).cpu()
+        
+        w_samples = np.array([sample_func(shape) for _ in range(10000)])
+        all_std = w_samples.std(axis=0)
+        mean_layer_std = all_std.mean(axis=1)[0]
         z_dim_std = all_std[0]
         print("Shapes: ", w_samples.shape, all_std.shape, z_dim_std.shape)
         print(mean_layer_std)
         print(z_dim_std[:10])
         
-        z_dim_std = z_dim_std.repeat(self.input_shape[0], 1).numpy()
+        #z_dim_std = z_dim_std.repeat(self.input_shape[0], 1).numpy()
+        z_dim_std = all_std
     else:
-        z_dim_std = 1
+        def sample_func(shape):
+                return truncnorm.rvs(-2, 2, size=shape).astype(np.float32)
+        z_dim_std = np.ones(shape)
+    print("Latent std shape: ", z_dim_std.shape)
+    print("Latent std first entries: ", z_dim_std.reshape(-1)[:10])
             
     # If num_init_noise < 2, simply initialize the same 
     # noise vector for all frames 
@@ -868,98 +900,89 @@ class LucidSonicDream:
         noise = self.noise
     elif self.visualize_lyrics:
         noise = self.noise
-    else:
-        if self.model_type == "vqgan":
-            def sample_func(size):
-                return torch.zeros(size).normal_(0., 4.).numpy()
-        elif self.use_all_layers:
-            def sample_func(size):
-                z = torch.tensor([truncnorm.rvs(-2, 2, size=512)], device=self.device)
-                with torch.no_grad():
-                    w_samples = self.model.mapping(z, None, truncation_psi=self.truncation_psi).cpu()
-                return w_samples.squeeze().numpy()
-                #sample = truncnorm.rvs(-2 * z_dim_std[0], 2 * z_dim_std[0], size=z_dim_std[0].shape).astype(np.float32)
-                #ssample = truncnorm.rvs(-2 * z_dim_std[0].mean(), 2 * z_dim_std[0].mean(), size=z_dim_std[0].shape).astype(np.float32)
-                #return np.expand_dims(sample, 0).repeat(repeats=size[0], axis=0)
-        else:
-            def sample_func(size):
-                return truncnorm.rvs(-2, 2, size=size).astype(np.float32)
-        size = self.input_shape.tolist()
+    else:           
+        shape = self.input_shape.tolist()
         if num_init_noise < 2:
-            noise = [sample_func(size)] * num_total_frames
+            noise = [sample_func(shape)] * num_total_frames
         # Otherwise, initialize num_init_noise different vectors, and generate
         # linear interpolations between these vectors
         else: 
-          # Initialize vectors
-          init_noise = [sample_func(size) for i in range(num_init_noise)]
-
-          # Compute number of steps between each pair of vectors
-          steps = int(np.floor(num_total_frames) / len(init_noise) - 1)
-          print("Steps between vectors", steps)  
-          # Interpolate
-          noise = full_frame_interpolation(init_noise, 
-                                           steps,
-                                           num_total_frames)
+            # Initialize vectors
+            init_noise = [sample_func(shape) for i in range(num_init_noise)]
+            # Compute number of steps between each pair of vectors
+            steps = int(np.floor(num_total_frames) / len(init_noise) - 1)
+            print("Steps between vectors", steps)  
+            # Interpolate
+            noise = full_frame_interpolation(init_noise, 
+                                             steps,
+                                             num_total_frames)
 
     print("noise len: ", len(noise))
     print("first noise shape: ", noise[0].shape)
 
     # Initialize "base" vectors based on Pulse/Motion Reactivity values
-    pulse_base = np.ones(self.input_shape.tolist()) * self.pulse_react  #  np.array([self.pulse_react] * self.input_shape)
-    motion_base = np.ones(self.input_shape.tolist()) * motion_react  # np.array([motion_react] * self.input_shape)
+    pulse_base = np.ones(shape) * self.pulse_react  #  np.array([self.pulse_react] * self.input_shape)
+    motion_base = np.ones(shape) * motion_react  # np.array([motion_react] * self.input_shape)
     
     # Randomly initialize "update directions" of noise vectors
-    motion_signs = np.array([random.choice([1, -1]) for _ in range(self.input_shape.prod())]).reshape(self.input_shape.tolist())
+    motion_signs = np.array([random.choice([1, -1]) for _ in range(self.input_shape.prod())]).reshape(shape)
 
     # Randomly initialize factors based on motion_randomness
     # motion_randomness is 0.5 by default
-    rand_factors = np.array([random.choice([1, 1 - self.motion_randomness]) for _ in range(self.input_shape.prod())]).reshape(self.input_shape.tolist())
+    rand_factors = np.array([random.choice([1, 1 - self.motion_randomness]) for _ in range(self.input_shape.prod())]).reshape(shape)
 
     
-    # Initialize lists of Pulse, Motion, and Class vectors
+    # Initialize running averages
     pulse_noise = 0
     motion_noise = 0
     motion_noise_sum = 0
+    # UPDATE NOISE # 
     for i in tqdm(range(num_total_frames)):
-      # UPDATE NOISE # 
+        # Re-initialize randomness factors every 4 seconds
+        if i % round(fps * 4) == 0:
+            rand_factors = np.array([random.choice([1, 1 - self.motion_randomness]) for _ in range(self.input_shape.prod())]).reshape(shape)
 
-      # Re-initialize randomness factors every 4 seconds
-      if i % round(fps * 4) == 0:
-        rand_factors = np.array([random.choice([1, 1 - self.motion_randomness]) for _ in range(self.input_shape.prod())]).reshape(self.input_shape.tolist())
-    
-      # Generate incremental update vectors for Pulse and Motion
-      spec_pulse = self.spec_norm_pulse[i]
-      spec_mot = self.spec_norm_motion[i]
-      if self.use_all_layers:
-            spec_pulse = spec_pulse.reshape(self.input_shape[0], 1) * z_dim_std
-            spec_mot = spec_mot.reshape(18, 1) * scipy.special.softmax(z_dim_std, axis=-1)
-      pulse_noise_add = pulse_base * spec_pulse
-      motion_noise_add = motion_base * spec_mot * motion_signs * rand_factors
+        # Generate incremental update vectors for Pulse and Motion
+        spec_pulse = self.spec_norm_pulse[i]
+        spec_mot = self.spec_norm_motion[i]
+        if self.use_all_layers:
+            spec_pulse = spec_pulse.reshape(self.input_shape[0], 1) 
+            spec_mot = spec_mot.reshape(18, 1)# * scipy.special.softmax(z_dim_std, axis=-1)
+        pulse_noise_add = pulse_base * spec_pulse * z_dim_std
+        motion_noise_add = motion_base * spec_mot * motion_signs * rand_factors * z_dim_std
 
-      if i == 100 and self.use_all_layers:
-          print("motion add: ", motion_noise_add.shape, motion_noise_add[0][:10])
-          print("noise: ", noise[i][:10])
-          print("motion sum shape: ", np.sum(motion_noise[:i+1], axis=0).shape)
-          print("motion sum: ", np.sum(motion_noise[:i+1], axis=0)[:10])
-          #quit()
-      # Smooth each update vector using a weighted average of
-      # itself and the previous vector
-      pulse_noise_add = pulse_noise * PULSE_SMOOTH + pulse_noise_add * (1 - PULSE_SMOOTH)
-      motion_noise_add = motion_noise * MOTION_SMOOTH + motion_noise_add * (1 - MOTION_SMOOTH)
-
-      # Update current noise vector by adding current Pulse vector and 
-      # a cumulative sum of Motion vectors
-      motion_noise_sum += motion_noise_add
-      noise[i] = noise[i] + (pulse_noise_add + motion_noise_sum * np.abs(noise[i]))
-      current_noise = noise[i]
+        if i == 10 or i == num_total_frames - 10:
+            print("motion signs: ", motion_signs.shape, motion_signs.reshape(-1)[:10])
+            print("rand_factors: ", rand_factors.shape, rand_factors.reshape(-1)[:10])
+            print("motion add: ", motion_noise_add.shape, motion_noise_add.reshape(-1)[:10])
+            print("motion sum: ", motion_noise_sum.shape, motion_noise_sum.reshape(-1)[:10])
+            print("pulse_noise_add: ", pulse_noise_add.shape, pulse_noise_add.reshape(-1)[:10])
+            print("noise: ", noise[i].reshape(-1)[:10])
+            print()
+            #quit()
+        # Smooth each update vector using a weighted average of
+        # itself and the previous vector
+        pulse_noise = pulse_noise_add * PULSE_SMOOTH + pulse_noise * (1 - PULSE_SMOOTH)
+        motion_noise = motion_noise_add * MOTION_SMOOTH + motion_noise * (1 - MOTION_SMOOTH)
+        motion_noise_sum += motion_noise
         
-      # Append Pulse and Motion update vectors to respective lists
-      pulse_noise = pulse_noise_add
-      motion_noise = motion_noise_add
+        # Update directions
+        #motion_signs = self.update_motion_signs(motion_signs, current_noise, z_dim_std)
+        thresh = z_dim_std * 0.3
+        m = motion_noise_sum + pulse_noise
+        # For each current value in noise vector, change direction if absolute 
+        # value +/- motion_react is larger than the threshold
+        motion_signs[noise[i] + m < -thresh] = 1
+        motion_signs[noise[i] + m >= thresh] = -1
 
-      # Update directions
-      motion_signs = self.update_motion_signs(motion_signs, current_noise, z_dim_std)
+        # Update current noise vector by adding current Pulse vector and 
+        # a cumulative sum of Motion vectors
+        noise[i] = noise[i] + pulse_noise + motion_noise_sum #* np.abs(noise[i]))
 
+        # Append Pulse and Motion update vectors to respective lists
+        #pulse_noise = pulse_noise_add
+        #motion_noise = motion_noise_add
+        
     self.noise = noise 
 
   def setup_effects(self):
@@ -1044,7 +1067,7 @@ class LucidSonicDream:
         # If style is a custom function, pass batches to the function
         if callable(self.style): 
             image_batch = self.style(noise_batch=noise_batch, 
-                                   class_batch=class_batch)
+                                     class_batch=class_batch)
         # Otherwise, generate frames with StyleGAN(2)
         else:
             if self.model_type == "vqgan":
@@ -1108,7 +1131,8 @@ class LucidSonicDream:
         
 
   def hallucinate(self,
-                  file_name: str, 
+                  file_name: str,
+                  output_dir: str,
                   output_audio: str = None,
                   fps: int = 43, 
                   resolution: int = None, 
@@ -1158,8 +1182,7 @@ class LucidSonicDream:
                   lyrics_iterations=200,
                   reset_latents_after_phrase=1,
                   
-                  width = 496,
-                  height = 496,
+                  clip_opt_kwargs=None,
                  ):
     '''Full pipeline of video generation'''
 
@@ -1185,6 +1208,9 @@ class LucidSonicDream:
 
     self.file_name = file_name if file_name[-4:] == '.mp4' else file_name + '.mp4'
     self.file_name = self.file_name.split("/")[-1].replace(" ", "_")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    self.output_dir = output_dir
     self.resolution = resolution
     self.batch_size = batch_size
     self.speed_fpm = speed_fpm
@@ -1217,7 +1243,7 @@ class LucidSonicDream:
             else:
                 input_shape = [512]
         elif self.model_type == "vqgan":
-            input_shape = [256, height // 16, width // 16]
+            input_shape = [256, self.height // 16, self.width // 16]
     self.input_shape = torch.tensor(input_shape)
 
     # stylegan2 params
@@ -1235,6 +1261,8 @@ class LucidSonicDream:
     self.concat_phrases = concat_phrases
     self.lyrics_iterations = lyrics_iterations
     self.reset_latents_after_phrase = reset_latents_after_phrase
+    # clip params
+    self.clip_opt_kwargs = clip_opt_kwargs
 
     # If there are changes in any of the following parameters,
     # re-initialize audio
@@ -1310,8 +1338,7 @@ class LucidSonicDream:
     audio = mpy.AudioFileClip('tmp.wav', fps=self.sr * 2)
     video = mpy.ImageSequenceClip(self.frames_dir, fps=self.sr / self.frame_duration)
     video = video.set_audio(audio)
-    video.write_videofile(self.file_name, audio_codec='aac', fps=self.fps)
-
+    video.write_videofile(os.path.join(self.output_dir, self.file_name), audio_codec='aac', fps=self.fps)
     # Delete temporary audio file
     os.remove('tmp.wav')
 

@@ -7,11 +7,16 @@ tqdm
 scipy
 scikit-image
 pygit2
-gdown'
+gdown
 mega.py
 requests
 pandas
 SoundFile
+librosa
+freetype-py
+pypng
+pygame
+opencv-python
 # for clmr
 simclr
 torchaudio-augmentations
