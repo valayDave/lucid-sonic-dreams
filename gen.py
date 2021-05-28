@@ -18,8 +18,8 @@ styles = {"janregnar": "../stylegan2-ada-pytorch/jan_regnart_640.pkl",
 
 songs = ["songs/henne_song.mp3", "songs/gnossi_1.mp3"]
 
-lyric_songs = ["Dancing Queen.mp3", "like a rolling Stone.mp3", "Shia LaBeouf.mp3", "Smells Like Teen Spirit.mp3", "Space Oddity.mp3", "This Is America.mp3", "Without Me.mp3", "(bowie) space oddity.mp3"]
-lyrics = ["Dancing Queen.srt", "like a rolling Stone.srt", "Shia LaBeouf.srt", "Smells Like Teen Spirit.srt", "Space Oddity.srt", "This Is America.srt", "Without Me.srt", "(bowie) space oddity.srt", "space_oddity_bowie_custom_1.srt"]
+lyric_songs = ["Dancing Queen.mp3", "like a rolling Stone.mp3", "Shia LaBeouf.mp3", "Smells Like Teen Spirit.mp3", "Space Oddity.mp3", "This Is America.mp3", "Without Me.mp3", "(bowie) space oddity.mp3", "be_my_weasel.mp3"]
+lyrics = ["Dancing Queen.srt", "like a rolling Stone.srt", "Shia LaBeouf.srt", "Smells Like Teen Spirit.srt", "Space Oddity.srt", "This Is America.srt", "Without Me.srt", "(bowie) space oddity.srt", "space_oddity_bowie_custom_1.srt", "be_my_weasel.srt"]
 
 lyric_songs = [os.path.join("songs_with_lyrics", l) for l in lyric_songs]
 lyrics = [os.path.join("songs_with_lyrics", l) for l in lyrics]
@@ -40,14 +40,22 @@ def hallus(style, song, height=496, width=496, model_type="stylegan", output_dir
 
     L.hallucinate(file_name=file_name, output_dir=output_dir, **kwargs)
 
+
+hallus(styles["vint_retro_scifi"], lyric_songs[0], batch_size=4, duration=25, pulse_react=1.0, motion_react=1.0, use_all_layers=0, use_old_beat = 1, use_song_latent_std = 0)
+hallus(styles["vint_retro_scifi"], lyric_songs[0], batch_size=4, duration=25, pulse_react=1.0, motion_react=1.0, use_all_layers=0, use_old_beat = 1, use_song_latent_std = 1)
+hallus(styles["vint_retro_scifi"], lyric_songs[0], batch_size=4, duration=25, pulse_react=1.0, motion_react=1.0, use_all_layers=0, use_old_beat = 0, use_song_latent_std = 0)
+hallus(styles["vint_retro_scifi"], lyric_songs[0], batch_size=4, duration=25, pulse_react=1.0, motion_react=1.0, use_all_layers=0, use_old_beat = 0, use_song_latent_std = 1)
+    
+quit()
     
 clip_opt_kwargs = {"latent_type": "code_sampling"}
-hallus(None, lyric_songs[7], width=480, height=480, lyrics_path=lyrics[8], batch_size=2, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.15, motion_react=0.00, lyrics_iterations=1000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0, no_beat=0, clip_opt_kwargs=clip_opt_kwargs)
+#hallus(None, lyric_songs[8], width=480, height=480, lyrics_path=lyrics[9], batch_size=1, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.15, motion_react=0.00, lyrics_iterations=1500, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0, no_beat=0, clip_opt_kwargs=clip_opt_kwargs)
 clip_opt_kwargs = {"circular": 1}
-hallus(None, lyric_songs[7], width=480, height=480, lyrics_path=lyrics[8], batch_size=2, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.15, motion_react=0.00, lyrics_iterations=1000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0, no_beat=0, clip_opt_kwargs=clip_opt_kwargs)
+#hallus(None, lyric_songs[8], width=480, height=480, lyrics_path=lyrics[9], batch_size=1, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.5, motion_react=0.00, lyrics_iterations=1500, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0, no_beat=0, clip_opt_kwargs=clip_opt_kwargs)
 clip_opt_kwargs = None
-hallus(None, lyric_songs[7], width=480, height=480, lyrics_path=lyrics[8], batch_size=2, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.15, motion_react=0.00, lyrics_iterations=1000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0, no_beat=0, clip_opt_kwargs=clip_opt_kwargs)
+hallus(None, lyric_songs[6], width=480, height=480, lyrics_path=lyrics[6], batch_size=1, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=1.0, motion_react=0.00, lyrics_iterations=1000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0, no_beat=0, clip_opt_kwargs=clip_opt_kwargs)
 
+hallus(None, lyric_songs[5], width=480, height=480, lyrics_path=lyrics[5], batch_size=1, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=1.0, motion_react=0.00, lyrics_iterations=1000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0, no_beat=0, clip_opt_kwargs=clip_opt_kwargs)
 quit()
 
 #hallus(None, lyric_songs[7], width=480, height=480, lyrics_path=lyrics[8], batch_size=2, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=0.15, motion_react=0.00, lyrics_iterations=1000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0, no_beat=0)

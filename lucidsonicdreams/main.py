@@ -2,24 +2,24 @@ import sys
 import os
 import shutil
 import pickle 
-from tqdm import tqdm
 import inspect
 import numpy as np
 import random
-from scipy.stats import truncnorm
-import scipy
 
+import scipy
 import torch
-import PIL
-from PIL import Image
+
 import skimage.exposure
 import librosa
 import soundfile
+import pygit2
 import moviepy.editor as mpy
 from moviepy.audio.AudioClip import AudioArrayClip
-import pygit2
+import PIL
+from PIL import Image
 from importlib import import_module
 from tqdm import tqdm
+from scipy.stats import truncnorm
 
 from .helper_functions import * 
 from .sample_effects import *
@@ -66,6 +66,30 @@ def show_styles():
 def minmax(array, axis=0):
                 return (array - array.min(axis, keepdims=True)) / (array.max(axis, keepdims=True) - array.min(axis, keepdims=True))
 
+
+class Welford():
+    def __init__(self,a_list=None):
+        self.n = 0
+        self.M = 0
+        self.S = 0
+
+    def update(self, x):
+        self.n += 1
+        newM = self.M + (x - self.M) / self.n
+        newS = self.S + (x - self.M) * (x - newM)
+        self.M = newM
+        self.S = newS
+
+    @property
+    def mean(self):
+        return self.M
+
+    @property
+    def std(self):
+        if self.n == 1:
+            return 0
+        return np.sqrt(self.S / (self.n - 1))
+   
 
 class MultiTensorDataset(torch.utils.data.Dataset):
     def __init__(self, tensor_list):
@@ -449,9 +473,10 @@ class LucidSonicDream:
     #latents = latents[mask]
     #smoothed = smoothed[:, mask]
     
-    self.noise = torch.stack([(pred.view(len(latents), 1, 1) * latents).sum(dim=0) for pred in smoothed]).numpy()
-    #self.store_noise(noise,)
-
+    noise = torch.stack([(pred.view(len(latents), 1, 1) * latents).sum(dim=0) for pred in smoothed]).numpy()
+    
+    # store to disk
+    noise = self.store_latents(noise, self.latent_folder, flush=1)
     
     #self.input_shape = latents[0].shape    
 
@@ -533,7 +558,7 @@ class LucidSonicDream:
     #print(start_times[:5])
     #print(end_times[:5])
     
-    # for each phrase, as add many previous words as long as it still fits into the context length
+    # for each phrase, add as many previous words as long as it still fits into the context length
     phrases = texts
     if self.concat_phrases:
         from style_clip.clip import tokenize
@@ -699,13 +724,11 @@ class LucidSonicDream:
 
             next_latent = current_latent
     
-    #self.noise = np.array(noise)
-    #print("Noise shape: ", self.noise.shape)
-    #self.input_shape = torch.tensor(start_latent.shape)
     self.store_latents(noise, self.latent_folder, flush=1)
+    self.lyric_transition_distances = fractions
+    self.lyric_transition_distances_raw = fracs_before_sig
 
 
-    
   def store_latents(self, latent_list, latent_folder, flush=False):
     if flush or len(latent_list) > self.max_latent_in_mem:
         latent_names_so_far = [f for f in os.listdir(latent_folder) if f.endswith(".npy")]
@@ -864,15 +887,13 @@ class LucidSonicDream:
     if self.model_type == "vqgan":
         #def sample_func(shape):
         #    return torch.zeros(shape).normal_(0., 4.).numpy()
-        if "latent_type" in self.clip_opt_kwargs and self.clip_opt_kwargs["latent_type"] == "code_sampling":
+        if self.clip_opt_kwargs is not None and "latent_type" in self.clip_opt_kwargs and self.clip_opt_kwargs["latent_type"] == "code_sampling":
             def sample_func(shape):
                 vqgan = self.model.model
                 vocab_size = vqgan.quantize.n_e
                 return torch.zeros(shape).float().normal_(0, 1).cpu().numpy()
                 
                 code_b = torch.randint(0, vocab_size, (self.toksX * self.toksY,)).cpu().numpy()
-                
-                
                 #encoded = vqgan.quantize.get_codebook_entry(code_b, None)
                 #encoded = encoded.permute(1, 0).reshape(shape).cpu().numpy()
                 return code_b
@@ -887,6 +908,7 @@ class LucidSonicDream:
         
         w_samples = np.array([sample_func(shape) for _ in range(1000)])
         z_dim_std = w_samples.std(axis=0)
+        z_dim_mean = w_samples.mean(axis=0)
     elif self.use_all_layers:
         def sample_func(shape):
             z = torch.tensor([truncnorm.rvs(-2, 2, size=512)], device=self.device)
@@ -902,6 +924,7 @@ class LucidSonicDream:
         all_std = w_samples.std(axis=0)
         mean_layer_std = all_std.mean(axis=1)[0]
         z_dim_std = all_std[0]
+        z_dim_mean = w_samples.mean(0)
         print("Shapes: ", w_samples.shape, all_std.shape, z_dim_std.shape)
         print(mean_layer_std)
         print(z_dim_std[:10])
@@ -912,9 +935,11 @@ class LucidSonicDream:
         def sample_func(shape):
                 return truncnorm.rvs(-2, 2, size=shape).astype(np.float32)
         z_dim_std = np.ones(shape)
+        z_dim_mean = np.ones(shape)
     print("Latent std shape: ", z_dim_std.shape)
     print("Latent std first entries: ", z_dim_std.reshape(-1)[:10])
-            
+         
+    # Init random latents if not using clmr or lyrics to do so
     # If num_init_noise < 2, simply initialize the same 
     # noise vector for all frames 
     print("Input shape: ", self.input_shape)        
@@ -934,79 +959,97 @@ class LucidSonicDream:
             noise = full_frame_interpolation(init_noise, 
                                              steps,
                                              num_total_frames)
+        noise = self.store_latents(noise, self.latent_folder, flush=1)
 
-    #print("noise len: ", len(noise))
-    #print("first noise shape: ", noise[0].shape)
-
+    num_latents = self.input_shape.prod()
+        
     # Initialize "base" vectors based on Pulse/Motion Reactivity values
-    pulse_base = np.ones(shape) * self.pulse_react  #  np.array([self.pulse_react] * self.input_shape)
-    motion_base = np.ones(shape) * motion_react  # np.array([motion_react] * self.input_shape)
+    pulse_base = np.ones(shape) * self.pulse_react
+    motion_base = np.ones(shape) * motion_react
+    # Randomly initialize "update directions" of motion vectors
+    motion_signs = np.array([random.choice([1, -1]) for _ in range(num_latents)]).reshape(shape)
+    # Randomly initialize factors based on motion_randomness (0.5 by default)
+    rand_factors = np.array([random.choice([1, 1 - self.motion_randomness]) for _ in range(num_latents)]).reshape(shape)
     
-    # Randomly initialize "update directions" of noise vectors
-    motion_signs = np.array([random.choice([1, -1]) for _ in range(self.input_shape.prod())]).reshape(shape)
 
-    # Randomly initialize factors based on motion_randomness
-    # motion_randomness is 0.5 by default
-    rand_factors = np.array([random.choice([1, 1 - self.motion_randomness]) for _ in range(self.input_shape.prod())]).reshape(shape)
-
+    # dataloader to iterate through latents
     ds = LatentsDataset(self.latent_folder)
     dl = torch.utils.data.DataLoader(ds, batch_size=self.batch_size, pin_memory=True, shuffle=False, num_workers=2)
+
+    if self.use_song_latent_std:
+        # calculate std of latents for each latent dimension dependent on their std within the latent vectors initialized for this song
+        welford_alg = Welford()
+        for i, batch in enumerate(tqdm(dl)):
+            batch = batch.numpy()
+            for latent in batch:
+                welford_alg.update(latent)
+        z_dim_mean = welford_alg.mean
+        z_dim_std = welford_alg.std
+        
     
-    # Initialize running averages
+    # Initialize running exponential averages
     pulse_noise = 0
     motion_noise = 0
     motion_noise_sum = 0
     count = 0
     noise = []
+    
+    scaled_sigmoid = lambda x: 1 / (1 + np.exp(-x - z_dim_mean) * z_dim_std)
+    self.motion_range = 5
+    
     # UPDATE NOISE # 
     for i, batch in enumerate(tqdm(dl)):
         batch = batch.numpy()
         for latent in batch:
             # Re-initialize randomness factors every 4 seconds
             if count % round(fps * 4) == 0:
-                rand_factors = np.array([random.choice([1, 1 - self.motion_randomness]) for _ in range(self.input_shape.prod())]).reshape(shape)
+                rand_factors = np.array([random.choice([1, 1 - self.motion_randomness]) for _ in range(num_latents)]).reshape(shape)
 
             # Generate incremental update vectors for Pulse and Motion
             spec_pulse = self.spec_norm_pulse[i]
             spec_mot = self.spec_norm_motion[i]
             if self.use_all_layers:
                 spec_pulse = spec_pulse.reshape(self.input_shape[0], 1) 
-                spec_mot = spec_mot.reshape(18, 1)# * scipy.special.softmax(z_dim_std, axis=-1)
-            pulse_noise_add = pulse_base * spec_pulse * z_dim_std
-            motion_noise_add = motion_base * spec_mot * motion_signs * rand_factors * z_dim_std
-
-            if i == 10 or i == num_total_frames - 10:
-                print("motion signs: ", motion_signs.shape, motion_signs.reshape(-1)[:10])
-                print("rand_factors: ", rand_factors.shape, rand_factors.reshape(-1)[:10])
-                print("motion add: ", motion_noise_add.shape, motion_noise_add.reshape(-1)[:10])
-                print("motion sum: ", motion_noise_sum.shape, motion_noise_sum.reshape(-1)[:10])
-                print("pulse_noise_add: ", pulse_noise_add.shape, pulse_noise_add.reshape(-1)[:10])
-                print("latent: ", latent.reshape(-1)[:10])
-                print()
-                #quit()
+                spec_mot = spec_mot.reshape(18, 1)  # * scipy.special.softmax(z_dim_std, axis=-1)
+            # Create update vectors for pulse and motion
+            if self.use_old_beat:
+                pulse_noise_add = pulse_base * spec_pulse * z_dim_std
+                motion_noise_add = motion_base * spec_mot * motion_signs * rand_factors * z_dim_std
+            else:
+                pulse_noise_add = pulse_base * spec_pulse * z_dim_std
+                motion_noise_add = motion_base * spec_mot * motion_signs * rand_factors * z_dim_std
+                
+                #pulse_bef_sig = pulse_base
+                #pulse_noise_add = scaled_sigmoid(pulse_bef_sig) * spec_pulse
+                #motion_bef_sig = motion_base
+                #motion_noise_add = scaled_sigmoid(motion_bef_sig) * spec_mot * motion_signs * rand_factors
+                
             # Smooth each update vector using a weighted average of
             # itself and the previous vector
             pulse_noise = pulse_noise_add * PULSE_SMOOTH + pulse_noise * (1 - PULSE_SMOOTH)
             motion_noise = motion_noise_add * MOTION_SMOOTH + motion_noise * (1 - MOTION_SMOOTH)
-            motion_noise_sum += motion_noise
-
-            # Update directions
-            #motion_signs = self.update_motion_signs(motion_signs, current_noise, z_dim_std)
-            thresh = z_dim_std * 0.3
-            m = motion_noise_sum + pulse_noise
-            # For each current value in noise vector, change direction if absolute 
-            # value +/- motion_react is larger than the threshold
-            motion_signs[latent + m < -thresh] = 1
-            motion_signs[latent + m >= thresh] = -1
 
             # Update current noise vector by adding current Pulse vector and 
             # a cumulative sum of Motion vectors
+            motion_noise_sum += motion_noise
             latent += pulse_noise + motion_noise_sum #* np.abs(noise[i]))
             
-            
+            # Store latents
             noise.append(latent)
-
             noise = self.store_latents(noise, self.beat_latent_folder)
+            
+            # update motion directions
+            if self.use_old_beat:
+                thresh_pos = z_dim_std * 2
+                thresh_neg = -1 * thresh_pos
+            else:
+                thresh_pos = latent + z_dim_std * self.motion_range
+                thresh_neg = latent + z_dim_std * self.motion_range
+            next_latent = latent + motion_noise_sum + pulse_noise
+            # For each current value in noise vector, change direction if absolute 
+            # value +/- motion_react is larger than the threshold
+            motion_signs[next_latent < thresh_neg] = 1
+            motion_signs[next_latent >= thresh_pos] = -1
             
             count += 1
         
@@ -1083,16 +1126,13 @@ class LucidSonicDream:
     # create dataloader
     ds = LatentsDataset(self.beat_latent_folder)
     dl = torch.utils.data.DataLoader(ds, batch_size=self.batch_size, pin_memory=True, shuffle=False, num_workers=2)
-    #ds = MultiTensorDataset([self.noise])
-    #dl = torch.utils.data.DataLoader(ds, batch_size=batch_size, pin_memory=True, shuffle=False, num_workers=2)
     torch.backends.cudnn.benchmark = True
 
     final_images = []
     file_names = []
-    
 
     # Generate frames
-    for i, (noise_batch,) in enumerate(tqdm(dl, position=0, desc="Generating frames")):
+    for i, noise_batch in enumerate(tqdm(dl, position=0, desc="Generating frames")):
         # If style is a custom function, pass batches to the function
         if callable(self.style): 
             image_batch = self.style(noise_batch=noise_batch, 
@@ -1100,6 +1140,8 @@ class LucidSonicDream:
         # Otherwise, generate frames with StyleGAN(2)
         else:
             if self.model_type == "vqgan":
+                #if len(noise_batch.shape) < len(self.input_shape.tolist()) + 1:
+                #    noise_batch = noise_batch.unsqueeze(0)
                 noise_batch = noise_batch.to(self.device, non_blocking=True)
                 with torch.no_grad():
                     self.model.latents = noise_batch.float()
@@ -1107,7 +1149,6 @@ class LucidSonicDream:
                 image_batch = (image_batch.permute(0, 2, 3, 1) * 255).clamp(0, 255).to(torch.uint8).cpu().numpy()
                 if len(image_batch.shape) > 4:
                     image_batch = image_batch.squeeze(0)
-            
             elif self.use_tf:
                 noise_batch = noise_batch.numpy()
                 class_batch = class_batch.numpy()
@@ -1196,6 +1237,8 @@ class LucidSonicDream:
                   cluster_pitches: str = None,
                   input_shape = None,
                   use_all_layers = 0,
+                  use_old_beat = 0,
+                  use_song_latent_std = 0,
                   
                   use_clmr=False,
                   clmr_softmax=False,
@@ -1270,6 +1313,8 @@ class LucidSonicDream:
     self.no_beat = no_beat
     self.cluster_pitches = cluster_pitches
     self.use_all_layers = use_all_layers
+    self.use_old_beat = use_old_beat
+    self.use_song_latent_std = use_song_latent_std
     if self.model_type == "stylegan" and (use_clmr or visualize_lyrics):
         self.use_all_layers = 1
     if input_shape is None:
@@ -1282,7 +1327,7 @@ class LucidSonicDream:
             f = 16
             self.toksX = self.width // f
             self.toksY = self.height // f
-            if "latent_type" in clip_opt_kwargs and clip_opt_kwargs["latent_type"] == "code_sampling":
+            if clip_opt_kwargs is not None and "latent_type" in clip_opt_kwargs and clip_opt_kwargs["latent_type"] == "code_sampling":
                 input_shape = (self.toksY * self.toksX, 1024)
             else:
                 input_shape = (256, self.toksY, self.toksX)
