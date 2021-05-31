@@ -1429,7 +1429,11 @@ class LucidSonicDream:
         audio = mpy.AudioFileClip('tmp.wav', fps=self.sr * 2)
         video = mpy.ImageSequenceClip(self.frames_dir, fps=self.sr / self.frame_duration)
         video = video.set_audio(audio)
-        video.write_videofile(os.path.join(self.output_dir, self.file_name), audio_codec='aac', fps=self.fps)
+        video_file_path = os.path.join(self.output_dir, self.file_name)
+        video.write_videofile(video_file_path, audio_codec='aac', fps=self.fps)
+        # HQ video
+        video.write_videofile(video_file_path.split(".")[0] + "_HQ.mp4", audio_codec='aac', fps=self.fps, codec="mpeg4")
+
         # Delete temporary audio file
         os.remove('tmp.wav')
     finally:
