@@ -39,7 +39,16 @@ def hallus(style, song, height=496, width=496, model_type="stylegan", output_dir
     file_name = f"{time_str}_{song_name}_{style_name}.mp4"
 
     L.hallucinate(file_name=file_name, output_dir=output_dir, **kwargs)
+# bowie
+clip_opt_kwargs = {"batch_size": 32}
+#hallus(None, lyric_songs[7], width=1080, height=720, lyrics_path=lyrics[8], batch_size=1, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=1.0, motion_react=0.00, lyrics_iterations=1000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0, no_beat=0, clip_opt_kwargs=clip_opt_kwargs)
+hallus(None, lyric_songs[7], width=1080, height=720, lyrics_path=lyrics[8], batch_size=4, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=1.0, motion_react=0.00, lyrics_iterations=1000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0, no_beat=1, clip_opt_kwargs=clip_opt_kwargs)
+#shia
+#hallus(None, lyric_songs[2], width=1080, height=720, lyrics_path=lyrics[2], batch_size=4, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=1.0, motion_react=0.00, lyrics_iterations=1000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0, no_beat=0, clip_opt_kwargs=clip_opt_kwargs)
+hallus(None, lyric_songs[2], width=1080, height=720, lyrics_path=lyrics[2], batch_size=4, visualize_lyrics=1, duration=None, lyrics_sigmoid_transition=1, lyrics_sigmoid_t=7, ampl_influences_speed=1, pulse_react=1.0, motion_react=0.00, lyrics_iterations=1000, reset_latents_after_phrase=1, model_type="vqgan", use_all_layers=0, no_beat=1, clip_opt_kwargs=clip_opt_kwargs)
 
+
+quit()
 
 hallus(styles["vint_retro_scifi"], lyric_songs[0], batch_size=4, duration=25, pulse_react=1.0, motion_react=1.0, use_all_layers=0, use_old_beat = 1, use_song_latent_std = 0)
 hallus(styles["vint_retro_scifi"], lyric_songs[0], batch_size=4, duration=25, pulse_react=1.0, motion_react=1.0, use_all_layers=0, use_old_beat = 1, use_song_latent_std = 1)
