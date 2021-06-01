@@ -599,6 +599,9 @@ class LucidSonicDream:
     os.makedirs(latents_path, exist_ok=True)
     print("Latents at: ", latents_path)
     from style_clip import Imagine, create_text_path
+    if self.clip_opt_kwargs is None:
+        self.clip_opt_kwargs = {}
+
     imagine = Imagine(
             save_progress=False,
             open_folder=False,
@@ -608,7 +611,6 @@ class LucidSonicDream:
             noise_opt=0,
             epochs=1,
             iterations=iterations,
-            batch_size=32,
             style=self.style,
             model_type=self.model_type,
             verbose=0,
@@ -725,7 +727,7 @@ class LucidSonicDream:
             next_latent = current_latent
     
     self.store_latents(noise, self.latent_folder, flush=1)
-    self.lyric_transition_distances = fractions
+    self.lyric_transition_distances = fracs
     self.lyric_transition_distances_raw = fracs_before_sig
 
 
@@ -796,7 +798,6 @@ class LucidSonicDream:
     self.spec_norm_class = get_spec_norm(wav_class, sr_class, 
                                         512, frame_duration)
     self.num_frames = len(self.spec_norm_class)
-
     
     if self.use_all_layers:
         self.spec_norm_pulse = np.stack(self.spec_norm_pulse.copy() for _ in range(self.input_shape[0]))
@@ -865,7 +866,20 @@ class LucidSonicDream:
                                               frame_duration, self.cluster_pitches, num_bands=num_bands)
   def generate_vectors(self):
     '''Generates noise and class vectors as inputs for each frame'''
+    # dataloader to iterate through latents
+    ds = LatentsDataset(self.latent_folder)
+    dl = torch.utils.data.DataLoader(ds, batch_size=self.batch_size, pin_memory=True, shuffle=False, num_workers=2)
+    
     if self.no_beat:
+        # store latents in new folder
+        os.rename(self.latent_folder, self.beat_latent_folder)
+        
+        #for i, batch in enumerate(tqdm(dl)):
+        #batch = batch.numpy()
+        #for latent in batch:
+        #    # Store latents
+        #    noise.append(latent)
+        #    noise = self.store_latents(noise, self.beat_latent_folder)
         return
     
     PULSE_SMOOTH = 0.75
@@ -970,11 +984,6 @@ class LucidSonicDream:
     motion_signs = np.array([random.choice([1, -1]) for _ in range(num_latents)]).reshape(shape)
     # Randomly initialize factors based on motion_randomness (0.5 by default)
     rand_factors = np.array([random.choice([1, 1 - self.motion_randomness]) for _ in range(num_latents)]).reshape(shape)
-    
-
-    # dataloader to iterate through latents
-    ds = LatentsDataset(self.latent_folder)
-    dl = torch.utils.data.DataLoader(ds, batch_size=self.batch_size, pin_memory=True, shuffle=False, num_workers=2)
 
     if self.use_song_latent_std:
         # calculate std of latents for each latent dimension dependent on their std within the latent vectors initialized for this song
@@ -1393,7 +1402,7 @@ class LucidSonicDream:
             if not self.style_exists:
                 print('Preparing style...')
                 if not callable(self.style):
-                  self.stylegan_init()
+                    self.stylegan_init()
                 self.style_exists = True
         elif self.model_type == "vqgan":
             self.use_tf = False
@@ -1432,7 +1441,7 @@ class LucidSonicDream:
         video_file_path = os.path.join(self.output_dir, self.file_name)
         video.write_videofile(video_file_path, audio_codec='aac', fps=self.fps)
         # HQ video
-        video.write_videofile(video_file_path.split(".")[0] + "_HQ.mp4", audio_codec='aac', fps=self.fps, codec="mpeg4")
+        video.write_videofile(video_file_path.split(".")[0] + ".avi", audio_codec='aac', fps=self.fps)
 
         # Delete temporary audio file
         os.remove('tmp.wav')
@@ -1441,8 +1450,10 @@ class LucidSonicDream:
         if not save_frames and hasattr(self, "frames_dir") and os.path.exists(self.frames_dir): 
           shutil.rmtree(self.frames_dir)
         # Delete temporary latent folders
-        shutil.rmtree(self.latent_folder)
-        shutil.rmtree(self.beat_latent_folder)
+        if os.path.exists(self.latent_folder):
+            shutil.rmtree(self.latent_folder)
+        if os.path.exists(self.beat_latent_folder):
+            shutil.rmtree(self.beat_latent_folder)
 
 
 class EffectsGenerator:
