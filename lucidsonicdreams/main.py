@@ -1441,7 +1441,7 @@ class LucidSonicDream:
         video_file_path = os.path.join(self.output_dir, self.file_name)
         video.write_videofile(video_file_path, audio_codec='aac', fps=self.fps)
         # HQ video
-        video.write_videofile(video_file_path.split(".")[0] + ".avi", audio_codec='aac', fps=self.fps)
+        video.write_videofile(video_file_path.split(".")[0] + ".avi", fps=self.fps, codec="png")
 
         # Delete temporary audio file
         os.remove('tmp.wav')
