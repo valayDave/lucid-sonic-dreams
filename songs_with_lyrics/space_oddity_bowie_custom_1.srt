@@ -64,11 +64,11 @@ King David Bowie sitting on throne
 
 17
 00:01:25,500 --> 00:01:30,000
-An Astronaut in space
+A crowd reading the Newspaper
 
 18
 00:01:30,500 --> 00:01:35,000
-A crowd reading the Newspaper
+An Astronaut in space
 
 19
 00:01:35,500 --> 00:01:40,000
@@ -80,7 +80,7 @@ Doors opening into infinity
 
 21
 00:01:45,500 --> 00:01:50,000
-Rainbow Aliens
+Octopus
 
 22
 00:01:51,500 --> 00:01:58,000
@@ -92,7 +92,7 @@ Spaceship window
 
 24
 00:02:08,500 --> 00:02:15,000
-Shining starry night
+Shining stars
 
 25
 00:02:15,500 --> 00:02:22,000
@@ -136,7 +136,7 @@ The Tree of life
 
 35
 00:03:11,000 --> 00:03:16,000
-A highway exit sign standing next to a highway. Unreal engine
+green highway exit sign
 
 36
 00:03:16,000 --> 00:03:21,000
@@ -148,7 +148,7 @@ Spaceship driving on a highway
 
 38
 00:03:26,000 --> 00:03:31,000
-Love and pink hearts
+Love
 
 39
 00:03:31,000 --> 00:03:36,000
@@ -168,11 +168,11 @@ David Bowie
 
 43
 00:03:51,000 --> 00:03:56,000
-David Bowie smiling
+Smiley face
 
 44
 00:03:56,000 --> 00:04:01,000
-Over the moon
+Baby
 
 45
 00:04:01,000 --> 00:04:06,000
