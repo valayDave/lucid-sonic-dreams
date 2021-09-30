@@ -6,6 +6,7 @@ stylegan2_tf/
 .ipynb_checkpoints/
 clmr_magnatagatune_mlp/
 clmr/
+.env/
 
 models/*
 songs/*
